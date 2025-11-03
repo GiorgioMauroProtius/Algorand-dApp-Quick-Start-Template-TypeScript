@@ -48,56 +48,55 @@ export default function App() {
   })
 
   return (
-  <SnackbarProvider maxSnack={3}>
-    <WalletProvider manager={walletManager}>
-      <div
-        style={{
-          fontFamily: 'Inter, sans-serif',
-          minHeight: '100vh',
-          background: '#0c0c0c',
-          color: '#e4e4e4',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <header
+    <SnackbarProvider maxSnack={3}>
+      <WalletProvider manager={walletManager}>
+        <div
           style={{
-            background: '#111',
-            borderBottom: '1px solid #222',
-            padding: '12px 24px',
+            fontFamily: 'Inter, sans-serif',
+            minHeight: '100vh',
+            background: '#0c0c0c',
+            color: '#e4e4e4',
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            flexDirection: 'column',
           }}
         >
-          <h2 style={{ color: '#00ffd0', margin: 0 }}>⚡ Protius Protocol</h2>
-          <nav style={{ display: 'flex', gap: 16 }}>
-            <a href="#" style={{ color: '#00ffd0' }}>Home</a>
-            <a href="#" style={{ color: '#00ffd0' }}>Projects</a>
-            <a href="#" style={{ color: '#00ffd0' }}>Profile</a>
-          </nav>
-        </header>
+          <header
+            style={{
+              background: '#111',
+              borderBottom: '1px solid #222',
+              padding: '12px 24px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <h2 style={{ color: '#00ffd0', margin: 0 }}>⚡ Protius Protocol</h2>
+            <nav style={{ display: 'flex', gap: 16 }}>
+              <a href="#" style={{ color: '#00ffd0' }}>Home</a>
+              <a href="#" style={{ color: '#00ffd0' }}>Projects</a>
+              <a href="#" style={{ color: '#00ffd0' }}>Profile</a>
+            </nav>
+          </header>
 
-        <main style={{ padding: '40px 24px', flex: 1 }}>
-          <Home />
-        </main>
+          <main style={{ padding: '40px 24px', flex: 1 }}>
+            <Home />
+          </main>
 
-        <footer
-          style={{
-            borderTop: '1px solid #222',
-            padding: '12px 24px',
-            textAlign: 'center',
-            fontSize: '0.85rem',
-            color: '#888',
-          }}
-        >
-          © 2025 Protius Protocol — Powered by Algorand TestNet
-        </footer>
-      </div>
+          <footer
+            style={{
+              borderTop: '1px solid #222',
+              padding: '12px 24px',
+              textAlign: 'center',
+              fontSize: '0.85rem',
+              color: '#888',
+            }}
+          >
+            © 2025 Protius Protocol — Powered by Algorand TestNet
+          </footer>
+        </div>
 
-      <Analytics />
-    </WalletProvider>
-  </SnackbarProvider>
-)
-
- 
+        <Analytics />
+      </WalletProvider>
+    </SnackbarProvider>
+  )
+}
