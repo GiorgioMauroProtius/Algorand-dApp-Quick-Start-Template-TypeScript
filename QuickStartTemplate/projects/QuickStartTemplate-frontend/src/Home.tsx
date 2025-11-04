@@ -12,7 +12,7 @@ export default function Home() {
         backgroundImage:
           "linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url(/protius-bg.jpg)",
         backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        backgroundPosition: 'center 70%',
         backgroundRepeat: 'no-repeat',
         color: '#eaeaea',
       }}
