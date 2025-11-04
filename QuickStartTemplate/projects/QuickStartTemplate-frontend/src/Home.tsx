@@ -1,137 +1,71 @@
-// Home.tsx - Cyberpunk Redesign
+import React from "react";
+import { useWallet } from "@txnlab/use-wallet-react";
+import ProjectForm, { ProjectInput } from "./components/ProjectForm";
 
-import { useWallet } from '@txnlab/use-wallet-react'
-import React, { useState } from 'react'
-import { AiOutlineDeploymentUnit, AiOutlineSend, AiOutlineStar, AiOutlineWallet } from 'react-icons/ai'
-import { BsArrowUpRightCircle, BsWallet2 } from 'react-icons/bs'
+export default function Home(): JSX.Element {
+  const { activeAccount, wallets } = useWallet();
+  const addr = activeAccount?.address ?? "";
 
-// Frontend modals
-import AppCalls from './components/AppCalls'
-import ConnectWallet from './components/ConnectWallet'
-import NFTmint from './components/NFTmint'
-import Tokenmint from './components/Tokenmint'
-import Transact from './components/Transact'
-
-interface HomeProps {}
-
-const neonBorder = "border border-[#00fff7]"
-const glassBg = "bg-[#181824]/90 backdrop-blur"
-const glowText = "text-[#00fff7] font-bold"
-const iconStyle = "text-2xl text-[#ff00cc]"
-
-const Home: React.FC<HomeProps> = () => {
-  const [openWalletModal, setOpenWalletModal] = useState<boolean>(false)
-  const [openPaymentModal, setOpenPaymentModal] = useState<boolean>(false)
-  const [openMintModal, setOpenMintModal] = useState<boolean>(false)
-  const [openTokenModal, setOpenTokenModal] = useState<boolean>(false)
-  const [openAppCallsModal, setOpenAppCallsModal] = useState<boolean>(false)
-
-  const { activeAddress } = useWallet()
+  async function handleSubmit(data: ProjectInput): Promise<void> {
+    // Frontend-only for now
+    console.log("Submitting project:", data);
+    // Later:
+    // 1. Upload description → IPFS/Supabase (meta_cid)
+    // 2. Call smart contract create_project(name, country, capacity_kw, meta_cid)
+  }
 
   return (
-    <div className={`min-h-screen ${glassBg} flex flex-col items-center justify-between font-mono`}>
-      {/* Navbar */}
-      <nav className={`w-full flex items-center justify-between px-4 py-3 ${neonBorder}`}>
-        <div className="flex items-center gap-2">
-          <span className="h-7 w-7 flex items-center justify-center rounded-full bg-[#ff00cc] text-[#181824] font-bold border border-[#00fff7]">A</span>
-          <span className={`${glowText} text-lg tracking-widest`}>Algorand CyberdApp</span>
-        </div>
-        <button
-          className={`flex items-center gap-2 px-3 py-1 rounded ${neonBorder} text-xs ${glowText}`}
-          onClick={() => setOpenWalletModal(true)}
+    <div style={{ padding: 24, maxWidth: 880, margin: "0 auto" }}>
+      <h1 style={{ color: "#00ffd0", marginBottom: 8 }}>⚡ Protius Project Registration</h1>
+      <p style={{ color: "#b9b9b9", marginBottom: 24 }}>
+        Register a renewable energy project to start the Protius lifecycle (DEVT → kWp → kWh).
+      </p>
+
+      {!addr ? (
+        <div
+          style={{
+            border: "1px dashed #333",
+            borderRadius: 12,
+            padding: 24,
+            background: "#0f0f0f",
+            textAlign: "center",
+            color: "#cfcfcf",
+          }}
         >
-          <BsWallet2 className="text-[#00fff7]" />
-          {activeAddress ? 'Wallet Linked' : 'Connect'}
-        </button>
-      </nav>
-
-      {/* Hero */}
-      <header className="w-full flex flex-col items-center py-10">
-        <div className="flex items-center gap-2 mb-2">
-          <AiOutlineWallet className={iconStyle} />
-          <span className={`${glowText} text-xs`}>Neon Network</span>
+          <p style={{ marginBottom: 8 }}>
+            Connect your Algorand wallet (Pera, Defly, Exodus) to begin.
+          </p>
+          {wallets.length === 0 && (
+            <small style={{ color: "#777" }}>
+              If no wallets appear, ensure your wallet extension/app is installed.
+            </small>
+          )}
         </div>
-        <h2 className={`${glowText} text-3xl text-center mb-2`}>Minimal Cyberpunk dApp</h2>
-        <p className="text-[#e0e0ff] text-sm text-center max-w-md mb-4">
-          Connect your wallet, send payments, mint NFTs, create tokens, and interact with contracts.
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setOpenWalletModal(true)}
-            className={`px-4 py-2 rounded ${neonBorder} ${glowText} text-xs`}
-          >
-            {activeAddress ? 'Manage Wallet' : 'Connect Wallet'}
-          </button>
-          <a
-            href="#features"
-            className={`px-4 py-2 rounded ${neonBorder} ${glowText} text-xs`}
-          >
-            Features
-          </a>
+      ) : (
+        <div
+          style={{
+            border: "1px solid #1f1f1f",
+            borderRadius: 12,
+            padding: 24,
+            background: "#0e0e0e",
+          }}
+        >
+          <ProjectForm devAddr={addr} onSubmit={handleSubmit} />
         </div>
-      </header>
+      )}
 
-      {/* Features */}
-      <main id="features" className="w-full flex-1 flex flex-col items-center">
-        {activeAddress ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
-            <button
-              className={`flex flex-col items-center gap-2 p-4 rounded ${glassBg} ${neonBorder} hover:bg-[#23234a]`}
-              onClick={() => setOpenPaymentModal(true)}
-            >
-              <AiOutlineSend className={iconStyle} />
-              <span className={`${glowText} text-sm`}>Send Payment</span>
-            </button>
-            <button
-              className={`flex flex-col items-center gap-2 p-4 rounded ${glassBg} ${neonBorder} hover:bg-[#23234a]`}
-              onClick={() => setOpenMintModal(true)}
-            >
-              <AiOutlineStar className={iconStyle} />
-              <span className={`${glowText} text-sm`}>Mint NFT</span>
-            </button>
-            <button
-              className={`flex flex-col items-center gap-2 p-4 rounded ${glassBg} ${neonBorder} hover:bg-[#23234a]`}
-              onClick={() => setOpenTokenModal(true)}
-            >
-              <BsArrowUpRightCircle className={iconStyle} />
-              <span className={`${glowText} text-sm`}>Create Token</span>
-            </button>
-            <button
-              className={`flex flex-col items-center gap-2 p-4 rounded ${glassBg} ${neonBorder} hover:bg-[#23234a]`}
-              onClick={() => setOpenAppCallsModal(true)}
-            >
-              <AiOutlineDeploymentUnit className={iconStyle} />
-              <span className={`${glowText} text-sm`}>Contract Interactions</span>
-            </button>
-          </div>
-        ) : (
-          <div className="w-full flex flex-col items-center py-10">
-            <p className="text-[#e0e0ff] text-base mb-4 text-center">
-              ⚡ Connect your wallet to unlock neon features.
-            </p>
-            <button
-              className={`px-6 py-3 rounded ${neonBorder} ${glowText} text-sm`}
-              onClick={() => setOpenWalletModal(true)}
-            >
-              Connect Wallet
-            </button>
-          </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="w-full py-4 text-center text-xs text-[#00fff7] font-bold border-t border-[#00fff7]">
-        Minimal cyberpunk dApp template.
+      <footer
+        style={{
+          marginTop: 40,
+          paddingTop: 16,
+          borderTop: "1px solid #222",
+          color: "#777",
+          fontSize: "0.85rem",
+          textAlign: "center",
+        }}
+      >
+        © 2025 Protius Protocol — Built on Algorand TestNet
       </footer>
-
-      {/* Modals */}
-      <ConnectWallet openModal={openWalletModal} closeModal={() => setOpenWalletModal(false)} />
-      <Transact openModal={openPaymentModal} setModalState={setOpenPaymentModal} />
-      <NFTmint openModal={openMintModal} setModalState={setOpenMintModal} />
-      <Tokenmint openModal={openTokenModal} setModalState={setOpenTokenModal} />
-      <AppCalls openModal={openAppCallsModal} setModalState={setOpenAppCallsModal} />
     </div>
-  )
+  );
 }
-
-export default Home
