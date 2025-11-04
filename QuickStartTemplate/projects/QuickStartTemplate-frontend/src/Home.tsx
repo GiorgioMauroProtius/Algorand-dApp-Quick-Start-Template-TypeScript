@@ -17,9 +17,10 @@ export default function Home(): JSX.Element {
   return (
   <div
     style={{
-      // Full-page background
+      // full-page background
       minHeight: '100vh',
-      backgroundImage: 'linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url(/protius-bg.jpg)',
+      backgroundImage:
+        "linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url(/protius-bg.jpg)",
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
@@ -38,57 +39,46 @@ export default function Home(): JSX.Element {
         ⚡ Protius Project Registration
       </h1>
       <p style={{ color: '#9b9b9b', marginBottom: 24 }}>
-        Register a renewable energy project to start the Protius lifecycle (DEVT → kWp → kWh).
+        Register a renewable energy project to start the Protius lifecycle
+        (DEVT → kWp → kWh).
       </p>
-      {/* Keep your wallet connection + ProjectForm logic here */}
-    </div>
-  </div>
-);
+
       {!addr ? (
         <div
           style={{
-            border: "1px dashed #333",
+            border: '1px dashed #333',
             borderRadius: 12,
             padding: 24,
-            background: "#0f0f0f",
-            textAlign: "center",
-            color: "#cfcfcf",
+            background: '#0f0f0f',
+            color: '#bcbcbc',
+            textAlign: 'center',
           }}
         >
-          <p style={{ marginBottom: 8 }}>
-            Connect your Algorand wallet (Pera, Defly, Exodus) to begin.
-          </p>
-          {wallets.length === 0 && (
-            <small style={{ color: "#777" }}>
-              If no wallets appear, ensure your wallet extension/app is installed.
-            </small>
-          )}
+          Connect your Algorand wallet (Pera, Defly, Exodus) to begin.
         </div>
       ) : (
-        <div
-          style={{
-            border: "1px solid #1f1f1f",
-            borderRadius: 12,
-            padding: 24,
-            background: "#0e0e0e",
+        <ProjectForm
+          devAddr={addr}
+          onSubmit={async (data) => {
+            // temporary: we’ll wire this to on-chain next
+            console.log('new project →', data, 'from', addr);
           }}
-        >
-          <ProjectForm devAddr={addr} onSubmit={handleSubmit} />
-        </div>
+        />
       )}
-
-      <footer
-        style={{
-          marginTop: 40,
-          paddingTop: 16,
-          borderTop: "1px solid #222",
-          color: "#777",
-          fontSize: "0.85rem",
-          textAlign: "center",
-        }}
-      >
-        © 2025 Protius Protocol — Built on Algorand TestNet
-      </footer>
     </div>
-  );
-}
+
+    <footer
+      style={{
+        maxWidth: 880,
+        margin: '24px auto',
+        padding: '12px 0',
+        color: '#8a8a8a',
+        borderTop: '1px solid #222',
+        textAlign: 'center',
+        fontSize: 12,
+      }}
+    >
+      © 2025 Protius Protocol — Built on Algorand TestNet
+    </footer>
+  </div>
+);
