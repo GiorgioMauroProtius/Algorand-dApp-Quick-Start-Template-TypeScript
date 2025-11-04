@@ -15,27 +15,35 @@ export default function Home(): JSX.Element {
   }
 
   return (
+  <div
+    style={{
+      // Full-page background
+      minHeight: '100vh',
+      backgroundImage: 'linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url(/protius-bg.jpg)',
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      color: '#eaeaea',
+    }}
+  >
     <div
       style={{
-    padding: 24,
-    maxWidth: 880,
-    margin: "0 auto",
-    minHeight: "100vh",
-    backgroundImage:
-      "url('https://www.protiusprotocol.com/_next/image?url=%2Fimages%2Flanding-bg.webp&w=1920&q=75')",
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
-    color: "#eaeaea",
-    backdropFilter: "blur(2px)",
-  }}
->
-
-      <h1 style={{ color: "#00ffd0", marginBottom: 8 }}>⚡ Protius Project Registration</h1>
-      <p style={{ color: "#b9b9b9", marginBottom: 24 }}>
+        padding: 24,
+        maxWidth: 880,
+        margin: '0 auto',
+        backdropFilter: 'blur(3px)',
+      }}
+    >
+      <h1 style={{ color: '#00ffd0', marginBottom: 8 }}>
+        ⚡ Protius Project Registration
+      </h1>
+      <p style={{ color: '#9b9b9b', marginBottom: 24 }}>
         Register a renewable energy project to start the Protius lifecycle (DEVT → kWp → kWh).
       </p>
-
+      {/* Keep your wallet connection + ProjectForm logic here */}
+    </div>
+  </div>
+);
       {!addr ? (
         <div
           style={{
