@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { enqueueSnackbar } from "notistack";
 
+/** ---------- Types ---------- */
 export type ProjectInput = {
   // Basics
   name: string;
@@ -23,12 +24,12 @@ export type ProjectInput = {
 
   // Financials
   currency: "USD" | "EUR" | "ZAR" | "CAD";
-  dev_capital: number;      // parsed number (from formatted string)
-  debt_ratio: number;       // percent 0–100
-  equity_required: number;  // parsed number (from formatted string)
+  dev_capital: number;
+  debt_ratio: number; // 0–100
+  equity_required: number;
 
   // Delivery
-  expected_cod: string;               // YYYY-MM-DD
+  expected_cod: string; // YYYY-MM-DD
   epc_contracted: boolean;
   owner_engineer_contracted: boolean;
 };
@@ -38,6 +39,7 @@ type Props = {
   onSubmit: (data: ProjectInput) => Promise<void> | void;
 };
 
+/** ---------- Styles ---------- */
 const labelStyle: React.CSSProperties = { fontSize: 14, color: "#b9b9b9" };
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -49,34 +51,31 @@ const inputStyle: React.CSSProperties = {
 };
 const rowStyle: React.CSSProperties = { display: "grid", gap: 8 };
 
-/* ===== Helpers (always-return; fixes TS7030) ===== */
+/** ---------- Helpers ---------- */
 const nf = new Intl.NumberFormat("en-US");
 
-/** Format any money-like text as '1,234'; returns "" if nothing valid. */
 const formatMoney = (raw: string): string => {
+  // Guarantee a string return on all paths
   try {
     const digits = raw.replace(/[^\d]/g, "");
-    return digits ? nf.format(Number(digits)) : "";
+    if (!digits) return "";
+    return nf.format(Number(digits));
   } catch {
     return "";
   }
 };
 
-/** Parse a formatted money string to a number; returns 0 on empty/bad input. */
 const toNumber = (formatted: string): number => {
-  try {
-    const digits = formatted.replace(/[^\d]/g, "");
-    return digits ? Number(digits) : 0;
-  } catch {
-    return 0;
-  }
+  const digits = formatted.replace(/[^\d]/g, "");
+  return digits ? Number(digits) : 0;
 };
 
-export default function ProjectForm({ devAddr, onSubmit }: Props) {
-  // UI toggle for advanced section
-  const [showAdvanced, setShowAdvanced] = useState(false);
+/** ---------- Component ---------- */
+export default function ProjectForm({ devAddr, onSubmit }: Props): JSX.Element {
+  // Toggle for advanced section
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
-  // local form state (strings for numeric inputs to preserve user typing)
+  // Local form state (keep money fields as strings to preserve commas)
   const [form, setForm] = useState({
     // basics
     name: "",
@@ -95,7 +94,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
     studies_pending: "",
     preconstruction_approvals: "",
 
-    // financials (with currency dropdown)
+    // financials
     currency: "USD" as ProjectInput["currency"],
     dev_capital_fmt: "",
     debt_ratio: "",
@@ -107,14 +106,14 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
     owner_engineer_contracted: false,
   });
 
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<boolean>(false);
 
-  function update<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
+  function update<K extends keyof typeof form>(k: K, v: (typeof form)[K]): void {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
-  // derived, parsed payload for submit
-  const payload: ProjectInput = useMemo(() => {
+  // Build the strongly-typed payload
+  const payload: ProjectInput = useMemo<ProjectInput>(() => {
     return {
       // basics
       name: form.name.trim(),
@@ -146,14 +145,21 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
     };
   }, [form]);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
 
     // minimal validation
-    if (!payload.name) return enqueueSnackbar("Please enter a project name.", { variant: "warning" });
-    if (!payload.country) return enqueueSnackbar("Please select a country.", { variant: "warning" });
+    if (!payload.name) {
+      enqueueSnackbar("Please enter a project name.", { variant: "warning" });
+      return;
+    }
+    if (!payload.country) {
+      enqueueSnackbar("Please select a country.", { variant: "warning" });
+      return;
+    }
     if (!payload.capacity_kw || payload.capacity_kw <= 0) {
-      return enqueueSnackbar("Capacity (kW) must be > 0.", { variant: "warning" });
+      enqueueSnackbar("Capacity (kW) must be > 0.", { variant: "warning" });
+      return;
     }
 
     try {
@@ -161,7 +167,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
       await onSubmit(payload);
       enqueueSnackbar("Project submitted for verification.", { variant: "success" });
 
-      // reset form
+      // reset
       setForm({
         name: "",
         country: "",
@@ -188,8 +194,9 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
         owner_engineer_contracted: false,
       });
       setShowAdvanced(false);
-    } catch (err: any) {
-      enqueueSnackbar(err?.message ?? "Could not submit project.", { variant: "error" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not submit project.";
+      enqueueSnackbar(msg, { variant: "error" });
     } finally {
       setBusy(false);
     }
@@ -200,9 +207,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
       {/* Wallet */}
       <div style={rowStyle}>
         <span style={labelStyle}>Developer Wallet</span>
-        <div style={{ ...inputStyle, border: "1px dashed #333", color: "#a8ffea" }}>
-          {devAddr}
-        </div>
+        <div style={{ ...inputStyle, border: "1px dashed #333", color: "#a8ffea" }}>{devAddr}</div>
       </div>
 
       {/* Basics */}
@@ -411,7 +416,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
             </div>
           </div>
 
-          {/* Binaries */}
+          {/* Binary flags */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 10 }}>
               <input
