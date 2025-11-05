@@ -11,15 +11,15 @@ export type ProjectInput = {
   // Extra basics
   distance_km: number;
 
-  // NEW: captured alongside the wallet address
-  user_name: string;
+  // Identity
+  user_name: string; // NEW: shown under wallet and sent in payload
 
   // Advanced (developer checklist)
   land_status: string;
   land_zoning: string;
   permitting: string;
   insurances: string;
-  contracts: string;
+  contracts: string; // (comment removed)
   studies_done: string;
   studies_pending: string;
   preconstruction_approvals: string;
@@ -31,13 +31,13 @@ export type ProjectInput = {
   equity_required: number; // parsed number (from formatted string)
 
   // Delivery
-  expected_cod: string; // YYYY-MM-DD
+  expected_cod: string;                // YYYY-MM-DD
   epc_contracted: boolean;
   owner_engineer_contracted: boolean;
 };
 
 type Props = {
-  devAddr: string; // connected wallet (display only for now)
+  devAddr: string; // connected wallet (display only)
   onSubmit: (data: ProjectInput) => Promise<void> | void;
 };
 
@@ -52,26 +52,28 @@ const inputStyle: React.CSSProperties = {
 };
 const rowStyle: React.CSSProperties = { display: "grid", gap: 8 };
 
-// ---- helpers for money formatting ----
+// helpers for money formatting
 const nf = new Intl.NumberFormat("en-US");
 const formatMoney = (raw: string): string => {
   try {
     const digits = raw.replace(/[^\d]/g, "");
-    if (!digits) return "";
+    if (!digits) {
+      return "";
+    }
     return nf.format(Number(digits));
   } catch {
     return "";
   }
 };
-const toNumber = (formatted: string) => {
+
+const toNumber = (formatted: string): number => {
   const digits = formatted.replace(/[^\d]/g, "");
   return digits ? Number(digits) : 0;
 };
-// -------------------------------------
 
 export default function ProjectForm({ devAddr, onSubmit }: Props) {
   // UI toggle for advanced section
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   // local form state (strings for money inputs to preserve commas)
   const [form, setForm] = useState({
@@ -81,7 +83,9 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
     capacity_kw: "",
     description: "",
     distance_km: "",
-    user_name: "", // <- NEW
+
+    // identity
+    user_name: "",
 
     // advanced
     land_status: "",
@@ -105,14 +109,14 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
     owner_engineer_contracted: false,
   });
 
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<boolean>(false);
 
-  function update<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
+  function update<K extends keyof typeof form>(k: K, v: (typeof form)[K]): void {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
   // derived, parsed payload for submit
-  const payload: ProjectInput = useMemo(() => {
+  const payload: ProjectInput = useMemo((): ProjectInput => {
     return {
       // basics
       name: form.name.trim(),
@@ -120,7 +124,9 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
       capacity_kw: Number(form.capacity_kw || 0),
       description: form.description.trim(),
       distance_km: Number(form.distance_km || 0),
-      user_name: form.user_name.trim(), // <- NEW
+
+      // identity
+      user_name: form.user_name.trim(),
 
       // advanced
       land_status: form.land_status.trim(),
@@ -145,14 +151,21 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
     };
   }, [form]);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
 
-    // minimal validation (expand later if you like)
-    if (!payload.name) return enqueueSnackbar("Please enter a project name.", { variant: "warning" });
-    if (!payload.country) return enqueueSnackbar("Please select a country.", { variant: "warning" });
+    // minimal validation
+    if (!payload.name) {
+      enqueueSnackbar("Please enter a project name.", { variant: "warning" });
+      return;
+    }
+    if (!payload.country) {
+      enqueueSnackbar("Please select a country.", { variant: "warning" });
+      return;
+    }
     if (!payload.capacity_kw || payload.capacity_kw <= 0) {
-      return enqueueSnackbar("Capacity (kW) must be > 0.", { variant: "warning" });
+      enqueueSnackbar("Capacity (kW) must be > 0.", { variant: "warning" });
+      return;
     }
 
     try {
@@ -167,6 +180,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
         capacity_kw: "",
         description: "",
         distance_km: "",
+
         user_name: "",
 
         land_status: "",
@@ -188,8 +202,12 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
         owner_engineer_contracted: false,
       });
       setShowAdvanced(false);
-    } catch (err: any) {
-      enqueueSnackbar(err?.message ?? "Could not submit project.", { variant: "error" });
+    } catch (err: unknown) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as any).message)
+          : "Could not submit project.";
+      enqueueSnackbar(message, { variant: "error" });
     } finally {
       setBusy(false);
     }
@@ -205,7 +223,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
         </div>
       </div>
 
-      {/* NEW: User Name */}
+      {/* User Name (NEW) */}
       <div style={rowStyle}>
         <label style={labelStyle}>User Name</label>
         <input
@@ -342,21 +360,21 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
           </div>
 
           {/* Text areas */}
-          {[
+          {([
             ["Permitting (completed / pending)", "permitting", "List permits obtained and those outstanding…"],
             ["Insurances", "insurances", "List insurances in place or committed…"],
-            ["Contracts", "contracts", "List contracts already in place…"], // <- wording cleaned
+            ["Contracts", "contracts", "List contracts already in place…"], // removed “(DD off-chain)”
             ["Technical Studies completed", "studies_done", "List completed studies…"],
             ["Technical Studies outstanding", "studies_pending", "List outstanding studies…"],
             ["Pre-Construction Approvals", "preconstruction_approvals", "If any, list…"],
-          ].map(([label, key, placeholder]) => (
-            <div key={String(key)} style={rowStyle}>
+          ] as const).map(([label, key, placeholder]) => (
+            <div key={key} style={rowStyle}>
               <label style={labelStyle}>{label}</label>
               <textarea
                 style={{ ...inputStyle, minHeight: 80, resize: "vertical" }}
                 value={(form as any)[key]}
                 onChange={(e) => update(key as any, e.target.value)}
-                placeholder={String(placeholder)}
+                placeholder={placeholder}
               />
             </div>
           ))}
