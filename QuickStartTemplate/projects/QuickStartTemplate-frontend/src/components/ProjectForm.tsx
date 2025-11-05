@@ -51,12 +51,16 @@ const rowStyle: React.CSSProperties = { display: "grid", gap: 8 };
 
 // helpers for money formatting
 const nf = new Intl.NumberFormat("en-US");
-const formatMoney = (raw: string) => {
-  // keep digits only
-  const digits = raw.replace(/[^\d]/g, "");
-  if (!digits) return "";
-  return nf.format(Number(digits));
+const formatMoney = (raw: string): string => {
+  try {
+    const digits = raw.replace(/[^\d]/g, "");
+    if (!digits) return "";
+    return nf.format(Number(digits));
+  } catch {
+    return "";
+  }
 };
+
 const toNumber = (formatted: string) => {
   const digits = formatted.replace(/[^\d]/g, "");
   return digits ? Number(digits) : 0;
