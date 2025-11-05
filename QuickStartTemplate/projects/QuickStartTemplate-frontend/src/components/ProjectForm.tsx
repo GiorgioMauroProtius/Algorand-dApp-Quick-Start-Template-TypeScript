@@ -23,12 +23,12 @@ export type ProjectInput = {
 
   // Financials
   currency: "USD" | "EUR" | "ZAR" | "CAD";
-  dev_capital: number;       // parsed number (from formatted string)
-  debt_ratio: number;        // percent 0–100
-  equity_required: number;   // parsed number (from formatted string)
+  dev_capital: number;      // parsed number (from formatted string)
+  debt_ratio: number;       // percent 0–100
+  equity_required: number;  // parsed number (from formatted string)
 
   // Delivery
-  expected_cod: string;                // YYYY-MM-DD
+  expected_cod: string;               // YYYY-MM-DD
   epc_contracted: boolean;
   owner_engineer_contracted: boolean;
 };
@@ -49,28 +49,34 @@ const inputStyle: React.CSSProperties = {
 };
 const rowStyle: React.CSSProperties = { display: "grid", gap: 8 };
 
-// helpers for money formatting
+/* ===== Helpers (always-return; fixes TS7030) ===== */
 const nf = new Intl.NumberFormat("en-US");
+
+/** Format any money-like text as '1,234'; returns "" if nothing valid. */
 const formatMoney = (raw: string): string => {
   try {
     const digits = raw.replace(/[^\d]/g, "");
-    if (!digits) return "";
-    return nf.format(Number(digits));
+    return digits ? nf.format(Number(digits)) : "";
   } catch {
     return "";
   }
 };
 
-const toNumber = (formatted: string) => {
-  const digits = formatted.replace(/[^\d]/g, "");
-  return digits ? Number(digits) : 0;
+/** Parse a formatted money string to a number; returns 0 on empty/bad input. */
+const toNumber = (formatted: string): number => {
+  try {
+    const digits = formatted.replace(/[^\d]/g, "");
+    return digits ? Number(digits) : 0;
+  } catch {
+    return 0;
+  }
 };
 
 export default function ProjectForm({ devAddr, onSubmit }: Props) {
   // UI toggle for advanced section
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // local form state (strings for money inputs to preserve commas)
+  // local form state (strings for numeric inputs to preserve user typing)
   const [form, setForm] = useState({
     // basics
     name: "",
@@ -143,7 +149,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    // minimal validation (expand later if you like)
+    // minimal validation
     if (!payload.name) return enqueueSnackbar("Please enter a project name.", { variant: "warning" });
     if (!payload.country) return enqueueSnackbar("Please select a country.", { variant: "warning" });
     if (!payload.capacity_kw || payload.capacity_kw <= 0) {
@@ -155,7 +161,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props) {
       await onSubmit(payload);
       enqueueSnackbar("Project submitted for verification.", { variant: "success" });
 
-      // reset
+      // reset form
       setForm({
         name: "",
         country: "",
