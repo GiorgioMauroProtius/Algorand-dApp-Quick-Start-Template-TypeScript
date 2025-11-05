@@ -1,19 +1,10 @@
+import React from "react";
 import { useWallet } from "@txnlab/use-wallet-react";
 import ProjectForm from "./components/ProjectForm";
 
 export default function Home() {
-  const { activeAccount, wallets } = useWallet();
+  const { wallets, activeAccount } = useWallet();
   const addr = activeAccount?.address ?? null;
-
-  // simple helper: label buttons nicely by wallet id/name
-  const prettyName = (id: string, name?: string) => {
-    if (name) return name;
-    const n = id.toLowerCase();
-    if (n.includes("pera")) return "Pera";
-    if (n.includes("defly")) return "Defly";
-    if (n.includes("exodus")) return "Exodus";
-    return id;
-  };
 
   return (
     <div
@@ -51,47 +42,44 @@ export default function Home() {
               padding: 24,
               background: "#0f0f0f",
               color: "#bcbcbc",
-              textAlign: "center",
             }}
           >
-            <div style={{ marginBottom: 12 }}>
-              Connect your Algorand wallet to begin.
+            <p style={{ marginBottom: 12 }}>
+              Connect your Algorand wallet to begin:
+            </p>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {wallets.map((w) => {
+                const meta = (w as any).metadata || {};
+                const name: string = meta.name || "Wallet";
+                return (
+                  <button
+                    key={name}
+                    onClick={() => {
+                      const connect = (w as any).connect;
+                      if (typeof connect === "function") connect();
+                    }}
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      border: "1px solid #00ffd0",
+                      background: "#002f2a",
+                      color: "#00ffd0",
+                      cursor: "pointer",
+                      fontWeight: 700,
+                    }}
+                    aria-label={`Connect ${name}`}
+                  >
+                    Connect {name}
+                  </button>
+                );
+              })}
             </div>
-
-            {/* Render a real button for each configured wallet provider */}
-            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-              {wallets.map((w) => (
-                <button
-                  key={w.id}
-                  onClick={() => w.connect()}
-                  disabled={!w.isAvailable}
-                  title={w.isAvailable ? "" : "Wallet not available in this browser"}
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    border: "1px solid #00ffd0",
-                    background: w.isAvailable ? "#002f2a" : "#0b1a18",
-                    color: "#00ffd0",
-                    cursor: w.isAvailable ? "pointer" : "not-allowed",
-                  }}
-                >
-                  {`Connect ${prettyName(w.id, w.metadata?.name)}`}
-                </button>
-              ))}
-            </div>
-
-            {/* Fallback text if no wallets are exposed */}
-            {wallets.length === 0 && (
-              <div style={{ marginTop: 12, fontSize: 13, color: "#9b9b9b" }}>
-                No wallet providers detected. Install Pera, Defly, or Exodus, then refresh.
-              </div>
-            )}
           </div>
         ) : (
           <ProjectForm
             devAddr={addr}
             onSubmit={async (data) => {
-              // TODO: wire to on-chain in next steps
+              // wire to on-chain in Step 5
               console.log("new project →", data, "from", addr);
             }}
           />
