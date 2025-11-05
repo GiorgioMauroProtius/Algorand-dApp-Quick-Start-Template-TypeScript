@@ -1,4 +1,4 @@
-import { useWallet } from '@txnlab/use-wallet-react';
+import { useWallet } from "@txnlab/use-wallet";
 import ProjectForm from './components/ProjectForm';
 
 export default function Home() {
