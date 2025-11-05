@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { enqueueSnackbar } from "notistack";
 
-/** ---------- Types ---------- */
 export type ProjectInput = {
   // Basics
   name: string;
@@ -11,6 +10,9 @@ export type ProjectInput = {
 
   // Extra basics
   distance_km: number;
+
+  // NEW: captured alongside the wallet address
+  user_name: string;
 
   // Advanced (developer checklist)
   land_status: string;
@@ -24,9 +26,9 @@ export type ProjectInput = {
 
   // Financials
   currency: "USD" | "EUR" | "ZAR" | "CAD";
-  dev_capital: number;
-  debt_ratio: number; // 0–100
-  equity_required: number;
+  dev_capital: number;     // parsed number (from formatted string)
+  debt_ratio: number;      // percent 0–100
+  equity_required: number; // parsed number (from formatted string)
 
   // Delivery
   expected_cod: string; // YYYY-MM-DD
@@ -39,7 +41,6 @@ type Props = {
   onSubmit: (data: ProjectInput) => Promise<void> | void;
 };
 
-/** ---------- Styles ---------- */
 const labelStyle: React.CSSProperties = { fontSize: 14, color: "#b9b9b9" };
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -51,11 +52,9 @@ const inputStyle: React.CSSProperties = {
 };
 const rowStyle: React.CSSProperties = { display: "grid", gap: 8 };
 
-/** ---------- Helpers ---------- */
+// ---- helpers for money formatting ----
 const nf = new Intl.NumberFormat("en-US");
-
 const formatMoney = (raw: string): string => {
-  // Guarantee a string return on all paths
   try {
     const digits = raw.replace(/[^\d]/g, "");
     if (!digits) return "";
@@ -64,18 +63,17 @@ const formatMoney = (raw: string): string => {
     return "";
   }
 };
-
-const toNumber = (formatted: string): number => {
+const toNumber = (formatted: string) => {
   const digits = formatted.replace(/[^\d]/g, "");
   return digits ? Number(digits) : 0;
 };
+// -------------------------------------
 
-/** ---------- Component ---------- */
-export default function ProjectForm({ devAddr, onSubmit }: Props): JSX.Element {
-  // Toggle for advanced section
-  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+export default function ProjectForm({ devAddr, onSubmit }: Props) {
+  // UI toggle for advanced section
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Local form state (keep money fields as strings to preserve commas)
+  // local form state (strings for money inputs to preserve commas)
   const [form, setForm] = useState({
     // basics
     name: "",
@@ -83,6 +81,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props): JSX.Element {
     capacity_kw: "",
     description: "",
     distance_km: "",
+    user_name: "", // <- NEW
 
     // advanced
     land_status: "",
@@ -94,7 +93,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props): JSX.Element {
     studies_pending: "",
     preconstruction_approvals: "",
 
-    // financials
+    // financials (with currency dropdown)
     currency: "USD" as ProjectInput["currency"],
     dev_capital_fmt: "",
     debt_ratio: "",
@@ -106,14 +105,14 @@ export default function ProjectForm({ devAddr, onSubmit }: Props): JSX.Element {
     owner_engineer_contracted: false,
   });
 
-  const [busy, setBusy] = useState<boolean>(false);
+  const [busy, setBusy] = useState(false);
 
-  function update<K extends keyof typeof form>(k: K, v: (typeof form)[K]): void {
+  function update<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
-  // Build the strongly-typed payload
-  const payload: ProjectInput = useMemo<ProjectInput>(() => {
+  // derived, parsed payload for submit
+  const payload: ProjectInput = useMemo(() => {
     return {
       // basics
       name: form.name.trim(),
@@ -121,6 +120,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props): JSX.Element {
       capacity_kw: Number(form.capacity_kw || 0),
       description: form.description.trim(),
       distance_km: Number(form.distance_km || 0),
+      user_name: form.user_name.trim(), // <- NEW
 
       // advanced
       land_status: form.land_status.trim(),
@@ -145,21 +145,14 @@ export default function ProjectForm({ devAddr, onSubmit }: Props): JSX.Element {
     };
   }, [form]);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    // minimal validation
-    if (!payload.name) {
-      enqueueSnackbar("Please enter a project name.", { variant: "warning" });
-      return;
-    }
-    if (!payload.country) {
-      enqueueSnackbar("Please select a country.", { variant: "warning" });
-      return;
-    }
+    // minimal validation (expand later if you like)
+    if (!payload.name) return enqueueSnackbar("Please enter a project name.", { variant: "warning" });
+    if (!payload.country) return enqueueSnackbar("Please select a country.", { variant: "warning" });
     if (!payload.capacity_kw || payload.capacity_kw <= 0) {
-      enqueueSnackbar("Capacity (kW) must be > 0.", { variant: "warning" });
-      return;
+      return enqueueSnackbar("Capacity (kW) must be > 0.", { variant: "warning" });
     }
 
     try {
@@ -174,6 +167,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props): JSX.Element {
         capacity_kw: "",
         description: "",
         distance_km: "",
+        user_name: "",
 
         land_status: "",
         land_zoning: "",
@@ -194,9 +188,8 @@ export default function ProjectForm({ devAddr, onSubmit }: Props): JSX.Element {
         owner_engineer_contracted: false,
       });
       setShowAdvanced(false);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Could not submit project.";
-      enqueueSnackbar(msg, { variant: "error" });
+    } catch (err: any) {
+      enqueueSnackbar(err?.message ?? "Could not submit project.", { variant: "error" });
     } finally {
       setBusy(false);
     }
@@ -207,7 +200,21 @@ export default function ProjectForm({ devAddr, onSubmit }: Props): JSX.Element {
       {/* Wallet */}
       <div style={rowStyle}>
         <span style={labelStyle}>Developer Wallet</span>
-        <div style={{ ...inputStyle, border: "1px dashed #333", color: "#a8ffea" }}>{devAddr}</div>
+        <div style={{ ...inputStyle, border: "1px dashed #333", color: "#a8ffea" }}>
+          {devAddr}
+        </div>
+      </div>
+
+      {/* NEW: User Name */}
+      <div style={rowStyle}>
+        <label style={labelStyle}>User Name</label>
+        <input
+          style={inputStyle}
+          value={form.user_name}
+          onChange={(e) => update("user_name", e.target.value)}
+          placeholder="e.g., Giorgio Mauro"
+          maxLength={80}
+        />
       </div>
 
       {/* Basics */}
@@ -338,7 +345,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props): JSX.Element {
           {[
             ["Permitting (completed / pending)", "permitting", "List permits obtained and those outstanding…"],
             ["Insurances", "insurances", "List insurances in place or committed…"],
-            ["Contracts", "contracts", "List contracts already in place… (DD off-chain)"],
+            ["Contracts", "contracts", "List contracts already in place…"], // <- wording cleaned
             ["Technical Studies completed", "studies_done", "List completed studies…"],
             ["Technical Studies outstanding", "studies_pending", "List outstanding studies…"],
             ["Pre-Construction Approvals", "preconstruction_approvals", "If any, list…"],
@@ -416,7 +423,7 @@ export default function ProjectForm({ devAddr, onSubmit }: Props): JSX.Element {
             </div>
           </div>
 
-          {/* Binary flags */}
+          {/* Binaries */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 10 }}>
               <input
