@@ -1,9 +1,19 @@
-import { useWallet, PROVIDER_ID } from "@txnlab/use-wallet-react";
+import { useWallet } from "@txnlab/use-wallet-react";
 import ProjectForm from "./components/ProjectForm";
 
 export default function Home() {
-  const { activeAccount, connect } = useWallet();
+  const { activeAccount, wallets } = useWallet();
   const addr = activeAccount?.address ?? null;
+
+  // simple helper: label buttons nicely by wallet id/name
+  const prettyName = (id: string, name?: string) => {
+    if (name) return name;
+    const n = id.toLowerCase();
+    if (n.includes("pera")) return "Pera";
+    if (n.includes("defly")) return "Defly";
+    if (n.includes("exodus")) return "Exodus";
+    return id;
+  };
 
   return (
     <div
@@ -47,47 +57,35 @@ export default function Home() {
             <div style={{ marginBottom: 12 }}>
               Connect your Algorand wallet to begin.
             </div>
-            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-              <button
-                onClick={() => connect(PROVIDER_ID.PERA)}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  border: "1px solid #00ffd0",
-                  background: "#002f2a",
-                  color: "#00ffd0",
-                  cursor: "pointer",
-                }}
-              >
-                Connect Pera
-              </button>
-              <button
-                onClick={() => connect(PROVIDER_ID.DEFLY)}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  border: "1px solid #00ffd0",
-                  background: "#002f2a",
-                  color: "#00ffd0",
-                  cursor: "pointer",
-                }}
-              >
-                Connect Defly
-              </button>
-              <button
-                onClick={() => connect(PROVIDER_ID.EXODUS)}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  border: "1px solid #00ffd0",
-                  background: "#002f2a",
-                  color: "#00ffd0",
-                  cursor: "pointer",
-                }}
-              >
-                Connect Exodus
-              </button>
+
+            {/* Render a real button for each configured wallet provider */}
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+              {wallets.map((w) => (
+                <button
+                  key={w.id}
+                  onClick={() => w.connect()}
+                  disabled={!w.isAvailable}
+                  title={w.isAvailable ? "" : "Wallet not available in this browser"}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    border: "1px solid #00ffd0",
+                    background: w.isAvailable ? "#002f2a" : "#0b1a18",
+                    color: "#00ffd0",
+                    cursor: w.isAvailable ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {`Connect ${prettyName(w.id, w.metadata?.name)}`}
+                </button>
+              ))}
             </div>
+
+            {/* Fallback text if no wallets are exposed */}
+            {wallets.length === 0 && (
+              <div style={{ marginTop: 12, fontSize: 13, color: "#9b9b9b" }}>
+                No wallet providers detected. Install Pera, Defly, or Exodus, then refresh.
+              </div>
+            )}
           </div>
         ) : (
           <ProjectForm
