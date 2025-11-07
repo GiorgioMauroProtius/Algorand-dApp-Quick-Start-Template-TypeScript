@@ -15,21 +15,21 @@ import {
 @contract({
   name: 'PVProjectStaking',
   stateTotals: {
-    globalUints: 7,  // totalStaked, fundingGoal, minimumGoal, stakingDeadline, isFunded, isClosed, usdc (as uint64)
-    globalBytes: 1,  // developer
-    localUints: 1,   // stakeAmount
+    globalUints: 7,
+    globalBytes: 1,
+    localUints: 1,
   },
 })
 export class PVProjectStaking extends Contract {
   // -------- Global state --------
-  developer = GlobalState<bytes>({ key: 'developer' });          // developer address (as bytes)
-  usdc      = GlobalState<uint64>({ key: 'usdc' });              // ASA id
-  fundingGoal     = GlobalState<uint64>({ key: 'funding_goal' });
-  minimumGoal     = GlobalState<uint64>({ key: 'minimum_goal' });
-  totalStaked     = GlobalState<uint64>({ initialValue: Uint64(0) });
+  developer = GlobalState<bytes>({ key: 'developer' });
+  usdc = GlobalState<uint64>({ key: 'usdc' });
+  fundingGoal = GlobalState<uint64>({ key: 'funding_goal' });
+  minimumGoal = GlobalState<uint64>({ key: 'minimum_goal' });
+  totalStaked = GlobalState<uint64>({ initialValue: Uint64(0) });
   stakingDeadline = GlobalState<uint64>({ key: 'staking_deadline' });
-  isFunded        = GlobalState<uint64>({ initialValue: Uint64(0) });
-  isClosed        = GlobalState<uint64>({ initialValue: Uint64(0) });
+  isFunded = GlobalState<uint64>({ initialValue: Uint64(0) });
+  isClosed = GlobalState<uint64>({ initialValue: Uint64(0) });
 
   // -------- Local state (per staker) --------
   stakeAmount = LocalState<uint64>({ key: 'stake' });
@@ -52,42 +52,40 @@ export class PVProjectStaking extends Contract {
   }
 
   @abimethod({ allowActions: 'OptIn' })
-  optIn(): void {
-    this.stakeAmount(this.txn.sender).value = Uint64(0);
+  optIn(txn: gtxn.ApplicationTxn): void {
+    this.stakeAmount(txn.sender).value = Uint64(0);
   }
 
   @abimethod()
-  stake(axferTxn: gtxn.AssetTransferTxn): void {
+  stake(txn: gtxn.ApplicationTxn, axferTxn: gtxn.AssetTransferTxn): void {
     assert(Global.latestTimestamp <= this.stakingDeadline.value, 'staking closed');
-    // Verify the asset transfer that must be in the same group
     assert(axferTxn.xferAsset.id === this.usdc.value, 'wrong asset');
-    assert(axferTxn.sender === this.txn.sender, 'wrong sender');
+    assert(axferTxn.sender === txn.sender, 'wrong sender');
     assert(axferTxn.assetReceiver === Global.currentApplicationAddress, 'wrong receiver');
     assert(axferTxn.assetAmount > 0, 'amount must be > 0');
 
     const amount = axferTxn.assetAmount;
-    const prev = this.stakeAmount(this.txn.sender).value;
-    this.stakeAmount(this.txn.sender).value = prev + amount;
+    const prev = this.stakeAmount(txn.sender).value;
+    this.stakeAmount(txn.sender).value = prev + amount;
     this.totalStaked.value = this.totalStaked.value + amount;
   }
 
   @abimethod()
-  confirmFundingSuccess(): void {
+  confirmFundingSuccess(txn: gtxn.ApplicationTxn): void {
     assert(Global.latestTimestamp > this.stakingDeadline.value, 'still open');
     assert(this.isFunded.value === 0, 'already funded');
-    assert(this.txn.sender === this.developer.value, 'only developer');
+    assert(txn.sender === this.developer.value, 'only developer');
     assert(this.totalStaked.value >= this.minimumGoal.value, 'minimum not met');
 
     this.isFunded.value = Uint64(1);
   }
 
   @abimethod()
-  triggerFinancialClose(premiumAxfer: gtxn.AssetTransferTxn): void {
+  triggerFinancialClose(txn: gtxn.ApplicationTxn, premiumAxfer: gtxn.AssetTransferTxn): void {
     assert(this.isFunded.value === 1, 'not funded');
     assert(this.isClosed.value === 0, 'already closed');
-    assert(this.txn.sender === this.developer.value, 'only developer');
+    assert(txn.sender === this.developer.value, 'only developer');
 
-    // premium from developer -> app
     assert(premiumAxfer.xferAsset.id === this.usdc.value, 'wrong asset');
     assert(premiumAxfer.sender === this.developer.value, 'wrong sender');
     assert(premiumAxfer.assetReceiver === Global.currentApplicationAddress, 'wrong receiver');
@@ -97,20 +95,19 @@ export class PVProjectStaking extends Contract {
   }
 
   @abimethod()
-  refund(refundAxfer: gtxn.AssetTransferTxn): void {
+  refund(txn: gtxn.ApplicationTxn, refundAxfer: gtxn.AssetTransferTxn): void {
     assert(Global.latestTimestamp > this.stakingDeadline.value, 'still open');
     assert(this.isFunded.value === 0, 'funded—no refund');
 
-    const owed = this.stakeAmount(this.txn.sender).value;
+    const owed = this.stakeAmount(txn.sender).value;
     assert(owed > 0, 'nothing to refund');
 
-    // Verify the asset transfer (app -> caller) matching the owed amount
     assert(refundAxfer.xferAsset.id === this.usdc.value, 'wrong asset');
     assert(refundAxfer.sender === Global.currentApplicationAddress, 'wrong sender');
-    assert(refundAxfer.assetReceiver === this.txn.sender, 'wrong receiver');
+    assert(refundAxfer.assetReceiver === txn.sender, 'wrong receiver');
     assert(refundAxfer.assetAmount === owed, 'wrong amount');
 
-    this.stakeAmount(this.txn.sender).value = Uint64(0);
+    this.stakeAmount(txn.sender).value = Uint64(0);
     this.totalStaked.value = this.totalStaked.value - owed;
   }
 
@@ -127,7 +124,7 @@ export class PVProjectStaking extends Contract {
   }
 
   @abimethod({ readonly: true })
-  myStake(): uint64 {
-    return this.stakeAmount(this.txn.sender).value;
+  myStake(txn: gtxn.ApplicationTxn): uint64 {
+    return this.stakeAmount(txn.sender).value;
   }
 }
