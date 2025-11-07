@@ -7,34 +7,36 @@ import {
   Uint64,
   abimethod,
   gtxn,
-  assert,
   Global,
   contract,
+  assert,
+  sender,
 } from '@algorandfoundation/algorand-typescript';
 
 @contract({
   name: 'PVProjectStaking',
   stateTotals: {
-    globalUints: 7,
-    globalBytes: 1,
-    localUints: 1,
+    globalUints: 7,  // totalStaked, fundingGoal, minimumGoal, stakingDeadline, isFunded, isClosed, usdc (as uint64)
+    globalBytes: 1,  // developer
+    localUints: 1,   // stakeAmount
   },
 })
 export class PVProjectStaking extends Contract {
   // -------- Global state --------
-  developer = GlobalState<bytes>({ key: 'developer' });
-  usdc = GlobalState<uint64>({ key: 'usdc' });
-  fundingGoal = GlobalState<uint64>({ key: 'funding_goal' });
-  minimumGoal = GlobalState<uint64>({ key: 'minimum_goal' });
-  totalStaked = GlobalState<uint64>({ initialValue: Uint64(0) });
+  developer = GlobalState<bytes>({ key: 'developer' });          // developer address (as bytes)
+  usdc      = GlobalState<uint64>({ key: 'usdc' });              // ASA id
+  fundingGoal     = GlobalState<uint64>({ key: 'funding_goal' });
+  minimumGoal     = GlobalState<uint64>({ key: 'minimum_goal' });
+  totalStaked     = GlobalState<uint64>({ initialValue: Uint64(0) });
   stakingDeadline = GlobalState<uint64>({ key: 'staking_deadline' });
-  isFunded = GlobalState<uint64>({ initialValue: Uint64(0) });
-  isClosed = GlobalState<uint64>({ initialValue: Uint64(0) });
+  isFunded        = GlobalState<uint64>({ initialValue: Uint64(0) });
+  isClosed        = GlobalState<uint64>({ initialValue: Uint64(0) });
 
   // -------- Local state (per staker) --------
   stakeAmount = LocalState<uint64>({ key: 'stake' });
 
   // -------- Lifecycle --------
+
   @abimethod({ onCreate: 'require' })
   create(
     developerAddr: bytes,
@@ -55,82 +57,55 @@ export class PVProjectStaking extends Contract {
     this.stakeAmount(this.txn.sender).value = Uint64(0);
   }
 
-  /**
-   * Group with an AssetTransfer from the caller -> app address.
-   */
   @abimethod()
-  stake(axferTxn: gtxn.AssetTransferTxn): void {
-    const caller = this.txn.sender;
+  stake(axferTxn: gtxn.AssetTransfer): void {
+    const caller = sender();
 
-    // window open?
-    assert(
-      Global.latestTimestamp <= this.stakingDeadline.value,
-      'staking closed'
-    );
-
-    // validate the grouped ASA transfer
+    assert(Global.latestTimestamp <= this.stakingDeadline.value, 'staking closed');
+    // Verify the asset transfer that must be in the same group
     assert(axferTxn.xferAsset.id === this.usdc.value, 'wrong asset');
     assert(axferTxn.sender === caller, 'wrong sender');
-    assert(
-      axferTxn.assetReceiver === Global.currentApplicationAddress,
-      'wrong receiver'
-    );
+    assert(axferTxn.assetReceiver === Global.currentApplicationAddress, 'wrong receiver');
     assert(axferTxn.assetAmount > 0, 'amount must be > 0');
 
     const amount = axferTxn.assetAmount;
     const prev = this.stakeAmount(caller).value;
-
     this.stakeAmount(caller).value = prev + amount;
     this.totalStaked.value = this.totalStaked.value + amount;
   }
 
-  /**
-   * Developer confirms success after window closes and min goal met.
-   */
   @abimethod()
   confirmFundingSuccess(): void {
-    const caller = this.txn.sender;
+    const caller = sender();
 
     assert(Global.latestTimestamp > this.stakingDeadline.value, 'still open');
     assert(this.isFunded.value === 0, 'already funded');
     assert(caller === this.developer.value, 'only developer');
-    assert(
-      this.totalStaked.value >= this.minimumGoal.value,
-      'minimum not met'
-    );
+    assert(this.totalStaked.value >= this.minimumGoal.value, 'minimum not met');
 
     this.isFunded.value = Uint64(1);
   }
 
-  /**
-   * At Financial Close the developer pays the premium (ASA transfer).
-   */
   @abimethod()
-  triggerFinancialClose(premiumAxfer: gtxn.AssetTransferTxn): void {
-    const caller = this.txn.sender;
+  triggerFinancialClose(premiumAxfer: gtxn.AssetTransfer): void {
+    const caller = sender();
 
     assert(this.isFunded.value === 1, 'not funded');
     assert(this.isClosed.value === 0, 'already closed');
     assert(caller === this.developer.value, 'only developer');
 
+    // premium from developer -> app
     assert(premiumAxfer.xferAsset.id === this.usdc.value, 'wrong asset');
     assert(premiumAxfer.sender === this.developer.value, 'wrong sender');
-    assert(
-      premiumAxfer.assetReceiver === Global.currentApplicationAddress,
-      'wrong receiver'
-    );
+    assert(premiumAxfer.assetReceiver === Global.currentApplicationAddress, 'wrong receiver');
     assert(premiumAxfer.assetAmount > 0, 'premium must be > 0');
 
     this.isClosed.value = Uint64(1);
   }
 
-  /**
-   * If funding failed, stakers can claim a refund
-   * by grouping a transfer from app -> caller of the owed amount.
-   */
   @abimethod()
-  refund(refundAxfer: gtxn.AssetTransferTxn): void {
-    const caller = this.txn.sender;
+  refund(refundAxfer: gtxn.AssetTransfer): void {
+    const caller = sender();
 
     assert(Global.latestTimestamp > this.stakingDeadline.value, 'still open');
     assert(this.isFunded.value === 0, 'funded—no refund');
@@ -138,20 +113,16 @@ export class PVProjectStaking extends Contract {
     const owed = this.stakeAmount(caller).value;
     assert(owed > 0, 'nothing to refund');
 
+    // Verify the asset transfer (app -> caller) matching the owed amount
     assert(refundAxfer.xferAsset.id === this.usdc.value, 'wrong asset');
-    assert(
-      refundAxfer.sender === Global.currentApplicationAddress,
-      'wrong sender'
-    );
+    assert(refundAxfer.sender === Global.currentApplicationAddress, 'wrong sender');
     assert(refundAxfer.assetReceiver === caller, 'wrong receiver');
     assert(refundAxfer.assetAmount === owed, 'wrong amount');
 
-    // clear stake and reduce total
     this.stakeAmount(caller).value = Uint64(0);
     this.totalStaked.value = this.totalStaked.value - owed;
   }
 
-  // -------- Views --------
   @abimethod({ readonly: true })
   getTotals(): [uint64, uint64, uint64, uint64, uint64, uint64] {
     return [
