@@ -7,9 +7,9 @@ import {
   Uint64,
   abimethod,
   gtxn,
+  assert,
   Global,
   contract,
-  assert,
 } from '@algorandfoundation/algorand-typescript';
 
 @contract({
@@ -36,14 +36,18 @@ export class PVProjectStaking extends Contract {
 
   // -------- Lifecycle --------
 
+  // Pass the app-call txn as an explicit arg so we can read its sender
   @abimethod({ onCreate: 'require' })
   create(
+    call: gtxn.ApplicationCallTxn,
     developerAddr: bytes,
     usdcAssetId: uint64,
     fundingGoal: uint64,
     minimumGoal: uint64,
     stakingPeriodSecs: uint64
   ): void {
+    // creator is the caller of the create
+    assert(call.onCompletion === 0, 'must be NoOp create');
     this.developer.value = developerAddr;
     this.usdc.value = usdcAssetId;
     this.fundingGoal.value = fundingGoal;
@@ -52,40 +56,46 @@ export class PVProjectStaking extends Contract {
   }
 
   @abimethod({ allowActions: 'OptIn' })
-  optIn(txn: gtxn.ApplicationTxn): void {
-    this.stakeAmount(txn.sender).value = Uint64(0);
+  optIn(call: gtxn.ApplicationCallTxn): void {
+    this.stakeAmount(call.sender).value = Uint64(0);
   }
 
   @abimethod()
-  stake(txn: gtxn.ApplicationTxn, axferTxn: gtxn.AssetTransferTxn): void {
+  stake(call: gtxn.ApplicationCallTxn, axferTxn: gtxn.AssetTransferTxn): void {
     assert(Global.latestTimestamp <= this.stakingDeadline.value, 'staking closed');
+
+    // Verify the asset transfer (USDC -> app address) from the caller
     assert(axferTxn.xferAsset.id === this.usdc.value, 'wrong asset');
-    assert(axferTxn.sender === txn.sender, 'wrong sender');
+    assert(axferTxn.sender === call.sender, 'wrong sender');
     assert(axferTxn.assetReceiver === Global.currentApplicationAddress, 'wrong receiver');
     assert(axferTxn.assetAmount > 0, 'amount must be > 0');
 
     const amount = axferTxn.assetAmount;
-    const prev = this.stakeAmount(txn.sender).value;
-    this.stakeAmount(txn.sender).value = prev + amount;
+    const prev = this.stakeAmount(call.sender).value;
+    this.stakeAmount(call.sender).value = prev + amount;
     this.totalStaked.value = this.totalStaked.value + amount;
   }
 
   @abimethod()
-  confirmFundingSuccess(txn: gtxn.ApplicationTxn): void {
+  confirmFundingSuccess(call: gtxn.ApplicationCallTxn): void {
     assert(Global.latestTimestamp > this.stakingDeadline.value, 'still open');
     assert(this.isFunded.value === 0, 'already funded');
-    assert(txn.sender === this.developer.value, 'only developer');
+    assert(call.sender === this.developer.value, 'only developer');
     assert(this.totalStaked.value >= this.minimumGoal.value, 'minimum not met');
 
     this.isFunded.value = Uint64(1);
   }
 
   @abimethod()
-  triggerFinancialClose(txn: gtxn.ApplicationTxn, premiumAxfer: gtxn.AssetTransferTxn): void {
+  triggerFinancialClose(
+    call: gtxn.ApplicationCallTxn,
+    premiumAxfer: gtxn.AssetTransferTxn
+  ): void {
     assert(this.isFunded.value === 1, 'not funded');
     assert(this.isClosed.value === 0, 'already closed');
-    assert(txn.sender === this.developer.value, 'only developer');
+    assert(call.sender === this.developer.value, 'only developer');
 
+    // Verify premium transfer (developer -> app)
     assert(premiumAxfer.xferAsset.id === this.usdc.value, 'wrong asset');
     assert(premiumAxfer.sender === this.developer.value, 'wrong sender');
     assert(premiumAxfer.assetReceiver === Global.currentApplicationAddress, 'wrong receiver');
@@ -95,19 +105,20 @@ export class PVProjectStaking extends Contract {
   }
 
   @abimethod()
-  refund(txn: gtxn.ApplicationTxn, refundAxfer: gtxn.AssetTransferTxn): void {
+  refund(call: gtxn.ApplicationCallTxn, refundAxfer: gtxn.AssetTransferTxn): void {
     assert(Global.latestTimestamp > this.stakingDeadline.value, 'still open');
     assert(this.isFunded.value === 0, 'funded—no refund');
 
-    const owed = this.stakeAmount(txn.sender).value;
+    const owed = this.stakeAmount(call.sender).value;
     assert(owed > 0, 'nothing to refund');
 
+    // Verify the refund transfer (app -> caller) for the exact owed amount
     assert(refundAxfer.xferAsset.id === this.usdc.value, 'wrong asset');
     assert(refundAxfer.sender === Global.currentApplicationAddress, 'wrong sender');
-    assert(refundAxfer.assetReceiver === txn.sender, 'wrong receiver');
+    assert(refundAxfer.assetReceiver === call.sender, 'wrong receiver');
     assert(refundAxfer.assetAmount === owed, 'wrong amount');
 
-    this.stakeAmount(txn.sender).value = Uint64(0);
+    this.stakeAmount(call.sender).value = Uint64(0);
     this.totalStaked.value = this.totalStaked.value - owed;
   }
 
@@ -124,7 +135,7 @@ export class PVProjectStaking extends Contract {
   }
 
   @abimethod({ readonly: true })
-  myStake(txn: gtxn.ApplicationTxn): uint64 {
-    return this.stakeAmount(txn.sender).value;
+  myStake(call: gtxn.ApplicationCallTxn): uint64 {
+    return this.stakeAmount(call.sender).value;
   }
 }
