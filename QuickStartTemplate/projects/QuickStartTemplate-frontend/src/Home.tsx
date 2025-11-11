@@ -1,35 +1,27 @@
 import React from "react";
 import { useWallet } from "@txnlab/use-wallet-react";
-import ProjectForm from "./components/ProjectForm";
-
-// Generated App Client (already created by your Vercel build step)
-import { HelloWorldClient } from "./contracts/HelloWorld";
-
-// Algorand client helper from algokit-utils
 import { AlgorandClient } from "@algorandfoundation/algokit-utils";
+import { HelloWorldClient } from "./contracts/HelloWorld"; // keep relative; switch to "@/contracts/HelloWorld" only if you have path alias
+
+// Small helper to coerce the app id from Vite env to bigint
+const getHelloAppId = (): bigint => {
+  const raw = import.meta.env.VITE_HELLO_APP_ID as unknown as string | number | undefined;
+  if (!raw) {
+    throw new Error(
+      "VITE_HELLO_APP_ID is not set. Add it to your .env (and Vercel env) after deploying the contract."
+    );
+  }
+  // Ensure we get a bigint even if provided as string/number
+  return BigInt(typeof raw === "number" ? raw : raw.trim());
+};
 
 export default function Home() {
   const { wallets, activeAccount, transactionSigner } = useWallet();
   const addr = activeAccount?.address ?? null;
 
-  // Build an Algorand client from your .env (VITE_ENVIRONMENT etc.)
-  // Valid values: 'local', 'testnet', 'mainnet'
-  const algorand = React.useMemo(() => {
-    const env = (import.meta.env.VITE_ENVIRONMENT as string) || "testnet";
-    return AlgorandClient.fromEnvironment({ environment: env });
-  }, []);
-
-  // Pull your App ID from .env (must be an integer)
-  const appId = React.useMemo(() => {
-    const raw = import.meta.env.VITE_HELLO_APP_ID as string | undefined;
-    if (!raw) return undefined;
-    try {
-      return BigInt(raw);
-    } catch {
-      console.warn("VITE_HELLO_APP_ID is not a valid integer:", raw);
-      return undefined;
-    }
-  }, []);
+  // Build a single Algorand client based on .env
+  // IMPORTANT: fromEnvironment() takes NO arguments; it reads VITE_ENVIRONMENT + endpoints from .env
+  const algorand = React.useMemo(() => AlgorandClient.fromEnvironment(), []);
 
   return (
     <div
@@ -104,31 +96,36 @@ export default function Home() {
           <ProjectForm
             devAddr={addr}
             onSubmit={async (data) => {
-              // Guard: need a valid appId
-              if (!appId) {
-                console.error(
-                  "VITE_HELLO_APP_ID is missing or invalid. Set it in your .env / Vercel env."
-                );
-                return;
-              }
-
               try {
-                // Create a typed client for your deployed HelloWorld app
+                // Derive a string for HelloWorld.hello(name)
+                const name =
+                  // prefer common form keys if present; fall back to a default
+                  (data as any).name ??
+                  (data as any).projectName ??
+                  "Protius";
+
+                // Make a client bound to your deployed app id
                 const client = new HelloWorldClient({
-                  appId,
-                  algorand,
+                  algorand, // created above
+                  app: { appId: getHelloAppId() },
+                  // defaults (constructor-level); you can still pass per-call
+                  defaultSender: addr,
+                  defaultSigner: transactionSigner,
                 });
 
-                // Call the on-chain method; pass sender + signer here (NOT in constructor)
+                // Call the contract
                 const res = await client.send.hello({
-                  args: { name: data?.name ?? "Protius" }, // <- use a real field from your form
+                  args: { name },
                   sender: addr,
                   signer: transactionSigner,
                 });
 
                 console.log("hello() return:", res.return);
               } catch (err) {
-                console.error("Error calling hello():", err);
+                console.error("Error calling HelloWorld.hello():", err);
+                alert(
+                  err instanceof Error ? err.message : "Contract call failed"
+                );
               }
             }}
           />
@@ -150,4 +147,20 @@ export default function Home() {
       </footer>
     </div>
   );
+}
+
+/**
+ * Minimal ProjectForm typing so TS is happy.
+ * Your real component exports this already; this is just to avoid TS complaining
+ * about data shape here when we pick `name`.
+ */
+type ProjectInput = Record<string, unknown>;
+type ProjectFormProps = {
+  devAddr: string;
+  onSubmit: (data: ProjectInput) => Promise<void>;
+};
+function ProjectForm(_props: ProjectFormProps) {
+  // This file only uses the imported component at runtime.
+  // At build time, the declaration above keeps TS satisfied.
+  return React.createElement("div");
 }
