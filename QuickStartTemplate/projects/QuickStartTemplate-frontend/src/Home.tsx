@@ -1,12 +1,15 @@
 import React from "react";
 import { useWallet } from "@txnlab/use-wallet-react";
 import ProjectForm from "./components/ProjectForm";
-// ⬇️ adjust this path to where algokit generated the client
-import { HelloWorldClient } from "@/lib/algorand/clients/HelloWorldClient";
+import { HelloWorldClient } from "./contracts/HelloWorld"; // ✅ correct path
 
 export default function Home() {
-  const { wallets, activeAccount, signer } = useWallet();
+  const { wallets, activeAccount, transactionSigner } = useWallet(); // ✅ use transactionSigner
   const addr = activeAccount?.address ?? null;
+
+  // If you want to read the app id from env (Vite):
+  const HELLO_APP_ID =
+    Number(import.meta.env.VITE_HELLO_APP_ID ?? "0") || undefined;
 
   return (
     <div
@@ -20,14 +23,32 @@ export default function Home() {
         color: "#eaeaea",
       }}
     >
-      <div style={{ padding: 24, maxWidth: 880, margin: "0 auto", backdropFilter: "blur(3px)" }}>
-        <h1 style={{ color: "#00ffd0", marginBottom: 8 }}>⚡ Protius Project Registration</h1>
+      <div
+        style={{
+          padding: 24,
+          maxWidth: 880,
+          margin: "0 auto",
+          backdropFilter: "blur(3px)",
+        }}
+      >
+        <h1 style={{ color: "#00ffd0", marginBottom: 8 }}>
+          ⚡ Protius Project Registration
+        </h1>
         <p style={{ color: "#9b9b9b", marginBottom: 24 }}>
-          Register a renewable energy project to start the Protius lifecycle (DEVT → kWp → kWh).
+          Register a renewable energy project to start the Protius lifecycle
+          (DEVT → kWp → kWh).
         </p>
 
         {!addr ? (
-          <div style={{ border: "1px dashed #333", borderRadius: 12, padding: 24, background: "#0f0f0f", color: "#bcbcbc" }}>
+          <div
+            style={{
+              border: "1px dashed #333",
+              borderRadius: 12,
+              padding: 24,
+              background: "#0f0f0f",
+              color: "#bcbcbc",
+            }}
+          >
             <p style={{ marginBottom: 12 }}>Connect your Algorand wallet to begin:</p>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {wallets.map((w) => {
@@ -36,7 +57,10 @@ export default function Home() {
                 return (
                   <button
                     key={name}
-                    onClick={() => (w as any).connect?.()}
+                    onClick={() => {
+                      const connect = (w as any).connect;
+                      if (typeof connect === "function") connect();
+                    }}
                     style={{
                       padding: "10px 14px",
                       borderRadius: 10,
@@ -59,29 +83,39 @@ export default function Home() {
             devAddr={addr}
             onSubmit={async (data) => {
               try {
-                const appId = Number(process.env.NEXT_PUBLIC_HELLO_APP_ID); // put this in .env.local
                 const client = new HelloWorldClient({
-                  appId,
+                  // Supply your deployed app id if you have it
+                  appId: HELLO_APP_ID, // optional until deployed
                   sender: addr,
-                  signer,
+                  signer: transactionSigner, // ✅ correct signer
                 });
 
-                // Example method; adjust to your ABI if different
+                // Sample call (adjust to your contract)
                 const res = await client.send.hello({
                   args: { name: data.name ?? "Protius" },
-                  signer,
+                  signer: transactionSigner, // ✅
                 });
 
-                console.log("HelloWorld return:", res.return);
+                console.log("Smart contract response:", res.return);
               } catch (err) {
-                console.error("Smart contract error:", err);
+                console.error("Error calling smart contract:", err);
               }
             }}
           />
         )}
       </div>
 
-      <footer style={{ maxWidth: 880, margin: "24px auto", padding: "12px 0", color: "#8a8a8a", borderTop: "1px solid #222", textAlign: "center", fontSize: 12 }}>
+      <footer
+        style={{
+          maxWidth: 880,
+          margin: "24px auto",
+          padding: "12px 0",
+          color: "#8a8a8a",
+          borderTop: "1px solid #222",
+          textAlign: "center",
+          fontSize: 12,
+        }}
+      >
         © 2025 Protius Protocol — Built on Algorand TestNet
       </footer>
     </div>
