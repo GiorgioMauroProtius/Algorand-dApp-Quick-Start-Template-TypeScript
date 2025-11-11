@@ -1,15 +1,16 @@
 import React from "react";
 import { useWallet } from "@txnlab/use-wallet-react";
+// If you have @ -> src alias, you can switch this import to "@/contracts/HelloWorld"
+import { HelloWorldClient } from "./contracts/HelloWorld";
 import ProjectForm from "./components/ProjectForm";
-import { HelloWorldClient } from "./contracts/HelloWorld"; // ✅ correct path
 
 export default function Home() {
-  const { wallets, activeAccount, transactionSigner } = useWallet(); // ✅ use transactionSigner
+  const { wallets, activeAccount, transactionSigner } = useWallet();
   const addr = activeAccount?.address ?? null;
 
-  // If you want to read the app id from env (Vite):
-  const HELLO_APP_ID =
-    Number(import.meta.env.VITE_HELLO_APP_ID ?? "0") || undefined;
+  // Read the deployed app id from Vite env
+  const appIdStr = import.meta.env.VITE_HELLO_APP_ID as string | undefined;
+  const appId = appIdStr ? BigInt(appIdStr) : undefined;
 
   return (
     <div
@@ -49,7 +50,9 @@ export default function Home() {
               color: "#bcbcbc",
             }}
           >
-            <p style={{ marginBottom: 12 }}>Connect your Algorand wallet to begin:</p>
+            <p style={{ marginBottom: 12 }}>
+              Connect your Algorand wallet to begin:
+            </p>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {wallets.map((w) => {
                 const meta = (w as any).metadata || {};
@@ -78,27 +81,45 @@ export default function Home() {
               })}
             </div>
           </div>
+        ) : !appId ? (
+          <div
+            style={{
+              marginTop: 16,
+              border: "1px solid #553",
+              background: "#2a1f1f",
+              color: "#ffb",
+              borderRadius: 10,
+              padding: 16,
+            }}
+          >
+            <strong>Missing env:</strong> Please set <code>VITE_HELLO_APP_ID</code>{" "}
+            (integer) in <code>.env.local</code> and/or Vercel Environment
+            Variables, then redeploy.
+          </div>
         ) : (
           <ProjectForm
             devAddr={addr}
             onSubmit={async (data) => {
               try {
+                // Build a client bound to your deployed app
                 const client = new HelloWorldClient({
-                  // Supply your deployed app id if you have it
-                  appId: HELLO_APP_ID, // optional until deployed
-                  sender: addr,
-                  signer: transactionSigner, // ✅ correct signer
+                  appId,                // bigint
+                  sender: addr,         // connected wallet address
+                  signer: transactionSigner, // signer from use-wallet-react
                 });
 
-                // Sample call (adjust to your contract)
-                const res = await client.send.hello({
-                  args: { name: data.name ?? "Protius" },
-                  signer: transactionSigner, // ✅
+                // Minimal on-chain call example: call 'hello(name)' with a string
+                const name = (data?.projectName as string) || "Protius";
+                const resp = await client.send.hello({
+                  args: { name },
+                  signer: transactionSigner,
                 });
 
-                console.log("Smart contract response:", res.return);
+                console.log("Smart contract response:", resp.return);
+                alert(`Contract said: ${resp.return}`);
               } catch (err) {
                 console.error("Error calling smart contract:", err);
+                alert("Error calling contract; see console for details.");
               }
             }}
           />
