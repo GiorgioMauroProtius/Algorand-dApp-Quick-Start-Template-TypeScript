@@ -1,16 +1,35 @@
 import React from "react";
 import { useWallet } from "@txnlab/use-wallet-react";
-// If you have @ -> src alias, you can switch this import to "@/contracts/HelloWorld"
-import { HelloWorldClient } from "./contracts/HelloWorld";
 import ProjectForm from "./components/ProjectForm";
+
+// Generated App Client (already created by your Vercel build step)
+import { HelloWorldClient } from "./contracts/HelloWorld";
+
+// Algorand client helper from algokit-utils
+import { AlgorandClient } from "@algorandfoundation/algokit-utils";
 
 export default function Home() {
   const { wallets, activeAccount, transactionSigner } = useWallet();
   const addr = activeAccount?.address ?? null;
 
-  // Read the deployed app id from Vite env
-  const appIdStr = import.meta.env.VITE_HELLO_APP_ID as string | undefined;
-  const appId = appIdStr ? BigInt(appIdStr) : undefined;
+  // Build an Algorand client from your .env (VITE_ENVIRONMENT etc.)
+  // Valid values: 'local', 'testnet', 'mainnet'
+  const algorand = React.useMemo(() => {
+    const env = (import.meta.env.VITE_ENVIRONMENT as string) || "testnet";
+    return AlgorandClient.fromEnvironment({ environment: env });
+  }, []);
+
+  // Pull your App ID from .env (must be an integer)
+  const appId = React.useMemo(() => {
+    const raw = import.meta.env.VITE_HELLO_APP_ID as string | undefined;
+    if (!raw) return undefined;
+    try {
+      return BigInt(raw);
+    } catch {
+      console.warn("VITE_HELLO_APP_ID is not a valid integer:", raw);
+      return undefined;
+    }
+  }, []);
 
   return (
     <div
@@ -81,45 +100,35 @@ export default function Home() {
               })}
             </div>
           </div>
-        ) : !appId ? (
-          <div
-            style={{
-              marginTop: 16,
-              border: "1px solid #553",
-              background: "#2a1f1f",
-              color: "#ffb",
-              borderRadius: 10,
-              padding: 16,
-            }}
-          >
-            <strong>Missing env:</strong> Please set <code>VITE_HELLO_APP_ID</code>{" "}
-            (integer) in <code>.env.local</code> and/or Vercel Environment
-            Variables, then redeploy.
-          </div>
         ) : (
           <ProjectForm
             devAddr={addr}
             onSubmit={async (data) => {
+              // Guard: need a valid appId
+              if (!appId) {
+                console.error(
+                  "VITE_HELLO_APP_ID is missing or invalid. Set it in your .env / Vercel env."
+                );
+                return;
+              }
+
               try {
-                // Build a client bound to your deployed app
+                // Create a typed client for your deployed HelloWorld app
                 const client = new HelloWorldClient({
-                  appId,                // bigint
-                  sender: addr,         // connected wallet address
-                  signer: transactionSigner, // signer from use-wallet-react
+                  appId,
+                  algorand,
                 });
 
-                // Minimal on-chain call example: call 'hello(name)' with a string
-                const name = (data?.projectName as string) || "Protius";
-                const resp = await client.send.hello({
-                  args: { name },
+                // Call the on-chain method; pass sender + signer here (NOT in constructor)
+                const res = await client.send.hello({
+                  args: { name: data?.name ?? "Protius" }, // <- use a real field from your form
+                  sender: addr,
                   signer: transactionSigner,
                 });
 
-                console.log("Smart contract response:", resp.return);
-                alert(`Contract said: ${resp.return}`);
+                console.log("hello() return:", res.return);
               } catch (err) {
-                console.error("Error calling smart contract:", err);
-                alert("Error calling contract; see console for details.");
+                console.error("Error calling hello():", err);
               }
             }}
           />
