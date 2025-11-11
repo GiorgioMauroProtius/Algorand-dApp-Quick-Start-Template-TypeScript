@@ -1,27 +1,25 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useWallet } from "@txnlab/use-wallet-react";
+import ProjectForm from "./components/ProjectForm";
+import { HelloWorldClient } from "./contracts/HelloWorld";
 import { AlgorandClient } from "@algorandfoundation/algokit-utils";
-import { HelloWorldClient } from "./contracts/HelloWorld"; // keep relative; switch to "@/contracts/HelloWorld" only if you have path alias
 
-// Small helper to coerce the app id from Vite env to bigint
-const getHelloAppId = (): bigint => {
-  const raw = import.meta.env.VITE_HELLO_APP_ID as unknown as string | number | undefined;
-  if (!raw) {
-    throw new Error(
-      "VITE_HELLO_APP_ID is not set. Add it to your .env (and Vercel env) after deploying the contract."
-    );
-  }
-  // Ensure we get a bigint even if provided as string/number
-  return BigInt(typeof raw === "number" ? raw : raw.trim());
-};
+function getHelloAppId(): bigint {
+  const raw = import.meta.env.VITE_HELLO_APP_ID as string | undefined;
+  if (!raw) throw new Error("VITE_HELLO_APP_ID is not set in your environment.");
+  return BigInt(raw); // must be bigint
+}
 
 export default function Home() {
   const { wallets, activeAccount, transactionSigner } = useWallet();
   const addr = activeAccount?.address ?? null;
 
-  // Build a single Algorand client based on .env
-  // IMPORTANT: fromEnvironment() takes NO arguments; it reads VITE_ENVIRONMENT + endpoints from .env
-  const algorand = React.useMemo(() => AlgorandClient.fromEnvironment(), []);
+  const algorand = useMemo(() => AlgorandClient.fromEnvironment(), []);
+
+  // Optional safety if your hook version doesn't expose transactionSigner:
+  const signer =
+    transactionSigner ??
+    (wallets.find((w: any) => w.isConnected)?.transactionSigner as any);
 
   return (
     <div
@@ -35,35 +33,15 @@ export default function Home() {
         color: "#eaeaea",
       }}
     >
-      <div
-        style={{
-          padding: 24,
-          maxWidth: 880,
-          margin: "0 auto",
-          backdropFilter: "blur(3px)",
-        }}
-      >
-        <h1 style={{ color: "#00ffd0", marginBottom: 8 }}>
-          ⚡ Protius Project Registration
-        </h1>
+      <div style={{ padding: 24, maxWidth: 880, margin: "0 auto", backdropFilter: "blur(3px)" }}>
+        <h1 style={{ color: "#00ffd0", marginBottom: 8 }}>⚡ Protius Project Registration</h1>
         <p style={{ color: "#9b9b9b", marginBottom: 24 }}>
-          Register a renewable energy project to start the Protius lifecycle
-          (DEVT → kWp → kWh).
+          Register a renewable energy project to start the Protius lifecycle (DEVT → kWp → kWh).
         </p>
 
         {!addr ? (
-          <div
-            style={{
-              border: "1px dashed #333",
-              borderRadius: 12,
-              padding: 24,
-              background: "#0f0f0f",
-              color: "#bcbcbc",
-            }}
-          >
-            <p style={{ marginBottom: 12 }}>
-              Connect your Algorand wallet to begin:
-            </p>
+          <div style={{ border: "1px dashed #333", borderRadius: 12, padding: 24, background: "#0f0f0f", color: "#bcbcbc" }}>
+            <p style={{ marginBottom: 12 }}>Connect your Algorand wallet to begin:</p>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {wallets.map((w) => {
                 const meta = (w as any).metadata || {};
@@ -97,35 +75,20 @@ export default function Home() {
             devAddr={addr}
             onSubmit={async (data) => {
               try {
-                // Derive a string for HelloWorld.hello(name)
-                const name =
-                  // prefer common form keys if present; fall back to a default
-                  (data as any).name ??
-                  (data as any).projectName ??
-                  "Protius";
-
-                // Make a client bound to your deployed app id
                 const client = new HelloWorldClient({
-                  algorand, // created above
-                  app: { appId: getHelloAppId() },
-                  // defaults (constructor-level); you can still pass per-call
+                  algorand,
+                  appId: getHelloAppId(), // bigint
                   defaultSender: addr,
-                  defaultSigner: transactionSigner,
+                  defaultSigner: signer,
                 });
 
-                // Call the contract
                 const res = await client.send.hello({
-                  args: { name },
-                  sender: addr,
-                  signer: transactionSigner,
+                  args: { name: data.name },
                 });
 
-                console.log("hello() return:", res.return);
+                console.log("Smart contract response:", res.return);
               } catch (err) {
-                console.error("Error calling HelloWorld.hello():", err);
-                alert(
-                  err instanceof Error ? err.message : "Contract call failed"
-                );
+                console.error("Error calling smart contract:", err);
               }
             }}
           />
@@ -147,20 +110,4 @@ export default function Home() {
       </footer>
     </div>
   );
-}
-
-/**
- * Minimal ProjectForm typing so TS is happy.
- * Your real component exports this already; this is just to avoid TS complaining
- * about data shape here when we pick `name`.
- */
-type ProjectInput = Record<string, unknown>;
-type ProjectFormProps = {
-  devAddr: string;
-  onSubmit: (data: ProjectInput) => Promise<void>;
-};
-function ProjectForm(_props: ProjectFormProps) {
-  // This file only uses the imported component at runtime.
-  // At build time, the declaration above keeps TS satisfied.
-  return React.createElement("div");
 }
