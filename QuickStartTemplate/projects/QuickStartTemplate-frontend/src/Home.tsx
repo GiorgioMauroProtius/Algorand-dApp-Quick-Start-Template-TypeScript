@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useWallet } from "@txnlab/use-wallet-react";
 import ProjectForm from "./components/ProjectForm";
+// If your project uses src alias, you can switch to "@/contracts/HelloWorld"
 import { HelloWorldClient } from "./contracts/HelloWorld";
 import { AlgorandClient } from "@algorandfoundation/algokit-utils";
 
@@ -11,15 +12,12 @@ function getHelloAppId(): bigint {
 }
 
 export default function Home() {
-  const { wallets, activeAccount, transactionSigner } = useWallet();
+  // Only pull what we actually use
+  const { activeAccount, transactionSigner } = useWallet();
   const addr = activeAccount?.address ?? null;
 
+  // Build an Algorand client from your Vite .env (you set VITE_ENVIRONMENT=testnet)
   const algorand = useMemo(() => AlgorandClient.fromEnvironment(), []);
-
-  // Optional safety if your hook version doesn't expose transactionSigner:
-  const signer =
-    transactionSigner ??
-    (wallets.find((w: any) => w.isConnected)?.transactionSigner as any);
 
   return (
     <div
@@ -41,45 +39,24 @@ export default function Home() {
 
         {!addr ? (
           <div style={{ border: "1px dashed #333", borderRadius: 12, padding: 24, background: "#0f0f0f", color: "#bcbcbc" }}>
-            <p style={{ marginBottom: 12 }}>Connect your Algorand wallet to begin:</p>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {wallets.map((w) => {
-                const meta = (w as any).metadata || {};
-                const name: string = meta.name || "Wallet";
-                return (
-                  <button
-                    key={name}
-                    onClick={() => {
-                      const connect = (w as any).connect;
-                      if (typeof connect === "function") connect();
-                    }}
-                    style={{
-                      padding: "10px 14px",
-                      borderRadius: 10,
-                      border: "1px solid #00ffd0",
-                      background: "#002f2a",
-                      color: "#00ffd0",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                    }}
-                    aria-label={`Connect ${name}`}
-                  >
-                    Connect {name}
-                  </button>
-                );
-              })}
-            </div>
+            <p style={{ marginBottom: 12 }}>
+              Connect your Algorand wallet to begin (use the wallet button in your header if present).
+            </p>
           </div>
         ) : (
           <ProjectForm
             devAddr={addr}
             onSubmit={async (data) => {
               try {
+                if (!transactionSigner) {
+                  throw new Error("Wallet signer not available. Please reconnect your wallet.");
+                }
+
                 const client = new HelloWorldClient({
                   algorand,
-                  appId: getHelloAppId(), // bigint
-                  defaultSender: addr,
-                  defaultSigner: signer,
+                  appId: getHelloAppId(),      // bigint from env
+                  defaultSender: addr,         // your connected address
+                  defaultSigner: transactionSigner, // signer from useWallet
                 });
 
                 const res = await client.send.hello({
@@ -87,6 +64,7 @@ export default function Home() {
                 });
 
                 console.log("Smart contract response:", res.return);
+                // optionally show a toast with res.return
               } catch (err) {
                 console.error("Error calling smart contract:", err);
               }
