@@ -2,34 +2,21 @@ import { Config } from '@algorandfoundation/algokit-utils'
 import { registerDebugEventHandlers } from '@algorandfoundation/algokit-utils-debug'
 import { consoleLogger } from '@algorandfoundation/algokit-utils/types/logging'
 
-// Node ESM-friendly shims + stdlib
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-// -----------------------------------------------------------------------------
-// ESM polyfill for __filename / __dirname
-// -----------------------------------------------------------------------------
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-// -----------------------------------------------------------------------------
-// AlgoKit debug / logging config
-// -----------------------------------------------------------------------------
+// AlgoKit debug / logging
 Config.configure({
   logger: consoleLogger,
   debug: true,
-  // traceAll: true, // Uncomment to emit AVM debugger traces / sourcemaps
+  // traceAll: true,
 })
 registerDebugEventHandlers()
 
-// Base directory that contains your per-contract subfolders (each with deploy-config.{ts,js})
-const baseDir = path.resolve(__dirname)
+// ESM-safe base directory (no __dirname)
+const baseDir = path.dirname(fileURLToPath(import.meta.url))
 
-// -----------------------------------------------------------------------------
-// Dynamically import a deployer module if present
-// Looks for: <dir>/deploy-config.ts or <dir>/deploy-config.js
-// -----------------------------------------------------------------------------
 async function importDeployerIfExists(dir: string) {
   const tsPath = path.resolve(dir, 'deploy-config.ts')
   const jsPath = path.resolve(dir, 'deploy-config.js')
@@ -37,26 +24,16 @@ async function importDeployerIfExists(dir: string) {
   let fileToImport: string | null = null
   if (fs.existsSync(tsPath)) fileToImport = tsPath
   else if (fs.existsSync(jsPath)) fileToImport = jsPath
-
   if (!fileToImport) return null
 
-  // In ESM, dynamic import works most reliably with file URLs
-  const deployerModule = await import(pathToFileURL(fileToImport).href)
-
-  // We expect the module to export a `deploy` function
-  if (!deployerModule || typeof deployerModule.deploy !== 'function') {
-    console.warn(
-      `Found ${path.basename(fileToImport)} but it does not export a 'deploy' function; skipping.`,
-    )
+  const mod = await import(pathToFileURL(fileToImport).href)
+  if (!mod || typeof mod.deploy !== 'function') {
+    console.warn(`Found ${path.basename(fileToImport)} but no export 'deploy'; skipping.`)
     return null
   }
-
-  return { ...deployerModule, name: path.basename(dir) } as { deploy: () => Promise<unknown>; name: string }
+  return { ...mod, name: path.basename(dir) } as { deploy: () => Promise<unknown>; name: string }
 }
 
-// -----------------------------------------------------------------------------
-// Collect all deployers from subdirectories of baseDir
-// -----------------------------------------------------------------------------
 async function getDeployers() {
   const directories = fs
     .readdirSync(baseDir, { withFileTypes: true })
@@ -67,29 +44,23 @@ async function getDeployers() {
   return deployers.filter((x): x is { deploy: () => Promise<unknown>; name: string } => x !== null)
 }
 
-// -----------------------------------------------------------------------------
-// Entry point: optional arg to select a single contract folder
-//   usage: tsx -r dotenv/config smart_contracts/index.ts [contractFolderName]
-// -----------------------------------------------------------------------------
+// usage: tsx -r dotenv/config smart_contracts/index.ts [contractFolderName]
 ;(async () => {
   const contractName = process.argv.length > 2 ? process.argv[2] : undefined
-  const allDeployers = await getDeployers()
+  const all = await getDeployers()
 
-  const deployers = contractName
-    ? allDeployers.filter((d) => d.name === contractName)
-    : allDeployers
+  const selected = contractName ? all.filter((d) => d.name === contractName) : all
 
-  if (contractName && deployers.length === 0) {
+  if (contractName && selected.length === 0) {
     console.warn(`No deployer found for contract folder: ${contractName}`)
     return
   }
-
-  if (deployers.length === 0) {
+  if (selected.length === 0) {
     console.warn(`No deploy-config.ts/js found under: ${baseDir}`)
     return
   }
 
-  for (const d of deployers) {
+  for (const d of selected) {
     try {
       console.log(`▶ Deploying ${d.name}...`)
       await d.deploy()
