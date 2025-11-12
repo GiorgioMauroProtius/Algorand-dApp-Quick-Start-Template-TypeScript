@@ -1,12 +1,12 @@
+// smart_contracts/index.ts
 import { Config } from '@algorandfoundation/algokit-utils'
 import { registerDebugEventHandlers } from '@algorandfoundation/algokit-utils-debug'
 import { consoleLogger } from '@algorandfoundation/algokit-utils/types/logging'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 
-import fs from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
-
-// AlgoKit debug / logging
+// Configure logging / debug
 Config.configure({
   logger: consoleLogger,
   debug: true,
@@ -14,59 +14,66 @@ Config.configure({
 })
 registerDebugEventHandlers()
 
-// ESM-safe base directory (no __dirname)
-const baseDir = path.dirname(fileURLToPath(import.meta.url))
+// ESM-safe dirname
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
+// Base directory where each contract folder (with deploy-config.ts/js) lives
+const baseDir = __dirname
+
+// Try to load a deploy-config.{ts,js} from a directory
 async function importDeployerIfExists(dir: string) {
   const tsPath = path.resolve(dir, 'deploy-config.ts')
   const jsPath = path.resolve(dir, 'deploy-config.js')
 
-  let fileToImport: string | null = null
-  if (fs.existsSync(tsPath)) fileToImport = tsPath
-  else if (fs.existsSync(jsPath)) fileToImport = jsPath
-  if (!fileToImport) return null
+  let fileToLoad: string | null = null
+  if (fs.existsSync(tsPath)) fileToLoad = tsPath
+  else if (fs.existsSync(jsPath)) fileToLoad = jsPath
 
-  const mod = await import(pathToFileURL(fileToImport).href)
-  if (!mod || typeof mod.deploy !== 'function') {
-    console.warn(`Found ${path.basename(fileToImport)} but no export 'deploy'; skipping.`)
-    return null
-  }
-  return { ...mod, name: path.basename(dir) } as { deploy: () => Promise<unknown>; name: string }
+  if (!fileToLoad) return null
+
+  // Dynamic ESM import from file path
+  const mod = await import(pathToFileURL(fileToLoad).href)
+  // We accept either a default export or a named deploy()
+  const deploy = (mod.default?.deploy ?? mod.deploy) as (opts?: any) => Promise<any>
+  if (typeof deploy !== 'function') return null
+
+  return { deploy, name: path.basename(dir) }
 }
 
+// Scan subfolders and collect deployers
 async function getDeployers() {
-  const directories = fs
-    .readdirSync(baseDir, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => path.resolve(baseDir, d.name))
+  const entries = fs.readdirSync(baseDir, { withFileTypes: true })
+  const dirs = entries.filter(e => e.isDirectory()).map(e => path.resolve(baseDir, e.name))
 
-  const deployers = await Promise.all(directories.map(importDeployerIfExists))
-  return deployers.filter((x): x is { deploy: () => Promise<unknown>; name: string } => x !== null)
+  const candidates = await Promise.all(dirs.map(importDeployerIfExists))
+  return candidates.filter((x): x is { deploy: Function; name: string } => x !== null)
 }
 
-// usage: tsx -r dotenv/config smart_contracts/index.ts [contractFolderName]
+// Execute
 ;(async () => {
   const contractName = process.argv.length > 2 ? process.argv[2] : undefined
-  const all = await getDeployers()
+  const deployers = await getDeployers()
+  const chosen = contractName ? deployers.filter(d => d.name === contractName) : deployers
 
-  const selected = contractName ? all.filter((d) => d.name === contractName) : all
-
-  if (contractName && selected.length === 0) {
-    console.warn(`No deployer found for contract folder: ${contractName}`)
-    return
-  }
-  if (selected.length === 0) {
-    console.warn(`No deploy-config.ts/js found under: ${baseDir}`)
+  if (contractName && chosen.length === 0) {
+    console.warn('No deployer found for contract name: ' + contractName)
     return
   }
 
-  for (const d of selected) {
+  for (const d of chosen) {
     try {
-      console.log(`▶ Deploying ${d.name}...`)
-      await d.deploy()
-      console.log(`✅ Deployed ${d.name}`)
+      console.log('➡️  Deploying: ' + d.name)
+      const result = await d.deploy()
+      if (result?.appClient?.appId) {
+        console.log('✅ Deployed ' + d.name + ' App ID: ' + String(result.appClient.appId))
+      } else {
+        console.log('✅ Deployed ' + d.name)
+      }
     } catch (e) {
-      console.error(`❌ Error deploying ${d.name}:`, e)
+      console.error('❌ Error deploying ' + d.name + ':', e)
+      process.exitCode = 1
     }
   }
 })()
+
