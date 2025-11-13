@@ -4,6 +4,9 @@ import ProjectForm from "./components/ProjectForm";
 import { HelloWorldClient } from "./contracts/HelloWorld";
 import { AlgorandClient } from "@algorandfoundation/algokit-utils";
 
+/**
+ * Read the HelloWorld app id from Vite env and return it as bigint.
+ */
 function getHelloAppId(): bigint {
   const raw = import.meta.env.VITE_HELLO_APP_ID as string | undefined;
   if (!raw) throw new Error("VITE_HELLO_APP_ID is not set in your environment.");
@@ -11,44 +14,54 @@ function getHelloAppId(): bigint {
 }
 
 /**
- * Build an Algorand client that ALWAYS uses the Vercel / Vite
- * TestNet environment variables (algonode endpoints).
+ * Build an Algorand client that ALWAYS uses the TestNet
+ * Algonode endpoints coming from Vite / Vercel env variables.
+ *
+ * This prevents the default "localhost:4001" behaviour you saw in the
+ * browser Console.
  */
 function useAlgorandClient() {
   return useMemo(() => {
-    const environment = (import.meta.env.VITE_ENVIRONMENT as string) || "testnet";
-
     const algodServer = import.meta.env.VITE_ALGOD_SERVER as string;
     const algodToken = (import.meta.env.VITE_ALGOD_TOKEN as string) || "";
-    const algodPort = (import.meta.env.VITE_ALGOD_PORT as string) || "";
+    const algodPortEnv = import.meta.env.VITE_ALGOD_PORT as string | undefined;
+    const algodPort = algodPortEnv ? Number(algodPortEnv) : 443;
 
     const indexerServer = import.meta.env.VITE_INDEXER_SERVER as string;
     const indexerToken = (import.meta.env.VITE_INDEXER_TOKEN as string) || "";
-    const indexerPort = (import.meta.env.VITE_INDEXER_PORT as string) || "";
+    const indexerPortEnv = import.meta.env.VITE_INDEXER_PORT as string | undefined;
+    const indexerPort = indexerPortEnv ? Number(indexerPortEnv) : 443;
 
-    // This forces TestNet (algonode) instead of localhost:4001
-    return AlgorandClient.fromConfig({
-      environment,
-      servers: {
-        algod: {
-          server: algodServer,
-          port: algodPort,
-          token: algodToken,
-        },
-        indexer: {
-          server: indexerServer,
-          port: indexerPort,
-          token: indexerToken,
-        },
+    const client = AlgorandClient.fromConfig({
+      algodConfig: {
+        server: algodServer,
+        port: algodPort,
+        token: algodToken,
+      },
+      indexerConfig: {
+        server: indexerServer,
+        port: indexerPort,
+        token: indexerToken,
       },
     });
+
+    // Tiny helper so you can inspect config safely in the browser console
+    if (typeof window !== "undefined") {
+      (window as any).__APP_ENV__ = {
+        environment: import.meta.env.VITE_ENVIRONMENT,
+        helloAppId: import.meta.env.VITE_HELLO_APP_ID,
+        algod: algodServer,
+        indexer: indexerServer,
+      };
+    }
+
+    return client;
   }, []);
 }
 
 export default function Home() {
   const { activeAccount, transactionSigner } = useWallet();
   const addr = activeAccount?.address ?? null;
-
   const algorand = useAlgorandClient();
 
   const [helloName, setHelloName] = useState("world");
@@ -101,24 +114,35 @@ export default function Home() {
         color: "#eaeaea",
       }}
     >
-      <div style={{ padding: 24, maxWidth: 880, margin: "0 auto", backdropFilter: "blur(3px)" }}>
-        <h1 style={{ color: "#00ffd0", marginBottom: 8 }}>⚡ Protius Project Registration</h1>
+      <div
+        style={{
+          padding: 24,
+          maxWidth: 880,
+          margin: "0 auto",
+          backdropFilter: "blur(3px)",
+        }}
+      >
+        <h1 style={{ color: "#00ffd0", marginBottom: 8 }}>
+          ⚡ Protius Project Registration
+        </h1>
         <p style={{ color: "#9b9b9b", marginBottom: 24 }}>
-          Register a renewable energy project to start the Protius lifecycle (DEVT → kWp → kWh).
+          Register a renewable energy project to start the Protius lifecycle
+          (DEVT → kWp → kWh).
         </p>
 
         {addr && (
           <div
             style={{
               marginBottom: 16,
-              padding: 12,
+              padding: "10px 12px",
               borderRadius: 8,
-              background: "rgba(0, 60, 50, 0.6)",
               border: "1px solid #00ffd0",
+              background: "rgba(0, 60, 54, 0.6)",
               fontSize: 14,
             }}
           >
-            <strong>Connected wallet:</strong> {addr}
+            <strong>Connected wallet:</strong>{" "}
+            <span style={{ fontFamily: "monospace" }}>{addr}</span>
           </div>
         )}
 
@@ -130,18 +154,23 @@ export default function Home() {
               padding: 24,
               background: "#0f0f0f",
               color: "#bcbcbc",
-              marginBottom: 24,
+              marginBottom: 32,
             }}
           >
             <p style={{ marginBottom: 12 }}>
-              Connect your Algorand wallet to begin (use the wallet button in your header).
+              Connect your Algorand wallet to begin (use the wallet button in
+              your header).
             </p>
           </div>
         ) : (
           <ProjectForm
             devAddr={addr}
             onSubmit={async (data) => {
-              console.log("Project form submitted (not yet wired to chain):", data);
+              // Still just logging for now – we’ll wire this to PV staking later
+              console.log(
+                "Project form submitted (not yet wired to chain):",
+                data,
+              );
             }}
           />
         )}
@@ -150,100 +179,104 @@ export default function Home() {
         <div
           style={{
             marginTop: 32,
-            padding: 24,
+            padding: 20,
             borderRadius: 16,
             border: "1px solid #00ffd0",
-            background: "rgba(0, 20, 18, 0.92)",
+            background: "rgba(0, 32, 28, 0.85)",
           }}
         >
-          <h2 style={{ marginBottom: 8, color: "#00ffd0" }}>TestNet HelloWorld smart contract</h2>
-          <p style={{ marginBottom: 8, color: "#c0f7ec", fontSize: 14 }}>
-            This demo dApp is currently pointing at the live <strong>HelloWorld</strong> application
-            on Algorand TestNet.
+          <h2
+            style={{
+              color: "#00ffd0",
+              marginTop: 0,
+              marginBottom: 8,
+              fontSize: 20,
+            }}
+          >
+            TestNet HelloWorld smart contract
+          </h2>
+
+          <p style={{ marginBottom: 8, color: "#c0fff2" }}>
+            This demo dApp is currently pointing at the live{" "}
+            <strong>HelloWorld</strong> application on Algorand TestNet.
           </p>
 
-          <p style={{ fontSize: 13, marginBottom: 12 }}>
-            <strong>App ID:</strong> {getHelloAppId().toString()}
+          <p style={{ marginBottom: 12 }}>
+            <strong>App ID:</strong>{" "}
+            <span style={{ fontFamily: "monospace" }}>
+              {getHelloAppId().toString()}
+            </span>
           </p>
 
           <a
-            href={`https://allo.info/apps/testnet/${getHelloAppId().toString()}`}
+            href={`https://explorer.perawallet.app/apps/${getHelloAppId().toString()}?network=testnet`}
             target="_blank"
             rel="noreferrer"
             style={{
               display: "inline-block",
-              marginBottom: 16,
               padding: "8px 14px",
               borderRadius: 999,
               border: "1px solid #00ffd0",
               color: "#00ffd0",
               textDecoration: "none",
-              fontSize: 13,
-              background: "rgba(0, 47, 42, 0.8)",
+              fontSize: 14,
+              marginBottom: 20,
             }}
           >
             View app on TestNet explorer
           </a>
 
-          <div
-            style={{
-              marginTop: 16,
-              paddingTop: 16,
-              borderTop: "1px dashed #16423f",
-              fontSize: 13,
-            }}
-          >
-            <p style={{ marginBottom: 8 }}>
-              <strong>Try calling the contract</strong>
-            </p>
-            <p style={{ marginBottom: 8 }}>
-              Type a name and call <code>hello(name)</code> on the contract. You&apos;ll see the
-              response below if your TestNet wallet is connected.
-            </p>
+          <h3 style={{ marginTop: 16, marginBottom: 8, fontSize: 16 }}>
+            Try calling the contract
+          </h3>
+          <p style={{ marginBottom: 12, fontSize: 14 }}>
+            Type a name and call <code>hello(name)</code> on the contract.
+            You&apos;ll see the response below if your TestNet wallet is
+            connected.
+          </p>
 
-            <div style={{ display: "flex", gap: 12, marginBottom: 8 }}>
-              <input
-                value={helloName}
-                onChange={(e) => setHelloName(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #333",
-                  background: "#111",
-                  color: "#eaeaea",
-                }}
-              />
-              <button
-                type="button"
-                onClick={handleHello}
-                disabled={helloLoading || !addr}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 10,
-                  border: "1px solid #00ffd0",
-                  background: helloLoading ? "#044" : "#004f45",
-                  color: "#00ffd0",
-                  cursor: helloLoading || !addr ? "not-allowed" : "pointer",
-                  fontWeight: 700,
-                  minWidth: 140,
-                }}
-              >
-                {helloLoading ? "Calling..." : "Call HelloWorld"}
-              </button>
-            </div>
-
-            {helloResult && (
-              <p style={{ marginTop: 6, color: "#a6ffdf" }}>
-                ✅ Received: <code>{helloResult}</code>
-              </p>
-            )}
-            {helloError && (
-              <p style={{ marginTop: 6, color: "#ff8a8a" }}>
-                ❌ Error: <code>{helloError}</code>
-              </p>
-            )}
+          <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+            <input
+              value={helloName}
+              onChange={(e) => setHelloName(e.target.value)}
+              style={{
+                flex: 1,
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid #333",
+                background: "#111",
+                color: "#eaeaea",
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleHello}
+              disabled={helloLoading}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 10,
+                border: "1px solid #00ffd0",
+                background: helloLoading ? "#003e35" : "#00352e",
+                color: "#00ffd0",
+                cursor: helloLoading ? "default" : "pointer",
+                fontWeight: 700,
+              }}
+            >
+              {helloLoading ? "Calling..." : "Call HelloWorld"}
+            </button>
           </div>
+
+          {helloResult && (
+            <p style={{ color: "#00ffb4", fontSize: 14 }}>
+              ✅ Received: <code>{helloResult}</code>
+            </p>
+          )}
+
+          {helloError && (
+            <p style={{ color: "#ff6b6b", fontSize: 14 }}>
+              ❌ Error: <code>{helloError}</code>
+            </p>
+          )}
         </div>
       </div>
 
