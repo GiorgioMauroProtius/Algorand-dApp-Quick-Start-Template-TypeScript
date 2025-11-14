@@ -1,151 +1,33 @@
 import React, { useMemo, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet-react";
-import { AlgorandClient } from "@algorandfoundation/algokit-utils";
+import ProjectForm from "./components/ProjectForm";
 import { HelloWorldClient } from "./contracts/HelloWorld";
-
-type ProjectStatus = "Draft" | "Approved";
-
-interface Project {
-  id: number;
-  devAddr: string;
-  userName: string;
-  projectName: string;
-  country: string;
-  capacityKw: number;
-  distanceKm: number;
-  description: string;
-  status: ProjectStatus;
-  totalStaked: number;
-  stakerCount: number;
-}
+import { AlgorandClient } from "@algorandfoundation/algokit-utils";
+import WalletSelector from "./components/WalletSelector";
 
 function getHelloAppId(): bigint {
   const raw = import.meta.env.VITE_HELLO_APP_ID as string | undefined;
   if (!raw) throw new Error("VITE_HELLO_APP_ID is not set in your environment.");
-  return BigInt(raw);
+  return BigInt(raw); // must be bigint
 }
 
-const COUNTRIES = ["Italy", "France", "South Africa", "Canada"];
-
 export default function Home() {
-  const { activeAccount, transactionSigner } = useWallet();
+  const { activeAccount, transactionSigner, providers } = useWallet();
   const addr = activeAccount?.address ?? null;
 
-  const [helloName, setHelloName] = useState("");
-  const [helloResult, setHelloResult] = useState<string | null>(null);
-  const [helloLoading, setHelloLoading] = useState(false);
-  const [helloError, setHelloError] = useState<string | null>(null);
+  // Very simple demo counters
+  const [projectsRegistered, setProjectsRegistered] = useState(0);
+  const [projectsApproved] = useState(0); // placeholder for later
+  const [totalStaked] = useState(0); // placeholder for later
 
-  const [tab, setTab] = useState<"register" | "projects" | "investor">("register");
-
-  const [userName, setUserName] = useState("");
-  const [projectName, setProjectName] = useState("");
-  const [country, setCountry] = useState("");
-  const [capacityKw, setCapacityKw] = useState("");
-  const [distanceKm, setDistanceKm] = useState("");
-  const [description, setDescription] = useState("");
-
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [nextProjectId, setNextProjectId] = useState(1);
-
-  const [stakeAmount, setStakeAmount] = useState("");
-
+  // Algorand client for TestNet (from .env / Vercel env)
   const algorand = useMemo(() => AlgorandClient.fromEnvironment(), []);
 
-  async function handleHelloSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!addr || !transactionSigner) {
-      setHelloError("Connect your wallet first.");
-      return;
-    }
-    setHelloError(null);
-    setHelloLoading(true);
-    try {
-      const client = new HelloWorldClient({
-        algorand,
-        appId: getHelloAppId(),
-        defaultSender: addr,
-        defaultSigner: transactionSigner,
-      });
-
-      const res: any = await client.send.hello({
-        args: { name: helloName || "world" },
-      });
-
-      console.log("HelloWorld response:", res);
-      const msg =
-        (res?.return && String(res.return)) ||
-        (res?.returnValue && String(res.returnValue)) ||
-        "Call succeeded.";
-      setHelloResult(msg);
-    } catch (err: any) {
-      console.error("Error calling HelloWorld:", err);
-      setHelloError(err?.message ?? "Unknown error");
-      setHelloResult(null);
-    } finally {
-      setHelloLoading(false);
-    }
-  }
-
-  function handleRegisterProject(e: React.FormEvent) {
-    e.preventDefault();
-    if (!addr) return;
-
-    const newProject: Project = {
-      id: nextProjectId,
-      devAddr: addr,
-      userName: userName.trim() || "Unnamed developer",
-      projectName: projectName.trim() || "Untitled project",
-      country: country || "N/A",
-      capacityKw: capacityKw ? Number(capacityKw) : 0,
-      distanceKm: distanceKm ? Number(distanceKm) : 0,
-      description: description.trim(),
-      status: "Draft",
-      totalStaked: 0,
-      stakerCount: 0,
-    };
-
-    setProjects((prev) => [...prev, newProject]);
-    setNextProjectId((n) => n + 1);
-
-    // Clear the form
-    setUserName("");
-    setProjectName("");
-    setCountry("");
-    setCapacityKw("");
-    setDistanceKm("");
-    setDescription("");
-
-    setTab("projects");
-  }
-
-  function handleApprove(id: number) {
-    setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status: "Approved" } : p)),
-    );
-  }
-
-  function handleMockStake(p: Project) {
-    const amount = stakeAmount ? Number(stakeAmount) : 0;
-    if (!amount || amount <= 0) return;
-
-    setProjects((prev) =>
-      prev.map((proj) =>
-        proj.id === p.id
-          ? {
-              ...proj,
-              totalStaked: proj.totalStaked + amount,
-              stakerCount: proj.stakerCount + 1,
-            }
-          : proj,
-      ),
-    );
-    setStakeAmount("");
-  }
-
-  const totalApproved = projects.filter((p) => p.status === "Approved").length;
-  const totalRegistered = projects.length;
-  const totalStakedAll = projects.reduce((sum, p) => sum + p.totalStaked, 0);
+  // Optional: find the Pera provider (not strictly required because WalletSelector already handles it)
+  const peraProvider = useMemo(
+    () => providers?.find((p) => p.metadata.id === "pera"),
+    [providers]
+  );
 
   return (
     <div
@@ -159,585 +41,392 @@ export default function Home() {
         color: "#eaeaea",
       }}
     >
-      <div style={{ padding: 24, maxWidth: 1000, margin: "0 auto", backdropFilter: "blur(3px)" }}>
-        <header
+      <div
+        style={{
+          padding: "32px 32px 40px",
+          maxWidth: 1200,
+          margin: "0 auto",
+        }}
+      >
+        {/* Top demo header */}
+        <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             marginBottom: 24,
+            gap: 16,
           }}
         >
-          <h1 style={{ color: "#00ffd0", margin: 0 }}>⚡ Protius Protocol – Demo</h1>
-          <div style={{ fontSize: 12, color: "#bdbdbd", textAlign: "right" }}>
-            <div>Network: TestNet</div>
-            <div style={{ maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis" }}>
-              Wallet: {addr ?? "Not connected"}
+          <div>
+            <h2 style={{ margin: 0, color: "#00ffd0", fontSize: 20 }}>
+              ⚡ Protius Protocol – Demo
+            </h2>
+            <p style={{ margin: "4px 0 0", color: "#a3a3a3", fontSize: 13 }}>
+              Simulate the Protius lifecycle: developer registers → Protius approves → investors stake.
+            </p>
+          </div>
+
+          {/* Network + wallet status + Connect button */}
+          <div style={{ textAlign: "right", fontSize: 12 }}>
+            <div style={{ color: "#9b9b9b" }}>
+              <strong>Network:</strong> TestNet
+            </div>
+            <div style={{ color: addr ? "#a8ffe8" : "#ffb3b3", marginBottom: 6 }}>
+              <strong>Wallet:</strong>{" "}
+              {addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "Not connected"}
+            </div>
+            {/* Wallet selector button (opens Pera / other wallets modal) */}
+            <div style={{ display: "inline-block" }}>
+              <WalletSelector />
             </div>
           </div>
-        </header>
+        </div>
 
+        {/* Step tabs */}
         <div
           style={{
             display: "flex",
-            gap: 16,
+            gap: 12,
+            marginBottom: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <StepPill
+            number={1}
+            label="Register project"
+            description="Developer submits a new renewable project."
+            active
+          />
+          <StepPill
+            number={2}
+            label="Approve & view projects (0)"
+            description="Protius reviews and approves projects."
+          />
+          <StepPill
+            number={3}
+            label="Investor / staking demo"
+            description="Investors stake demo USDC into approved projects."
+          />
+        </div>
+
+        {/* Counters row */}
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
             marginBottom: 24,
             flexWrap: "wrap",
           }}
         >
-          <button
-            type="button"
-            onClick={() => setTab("register")}
-            style={{
-              padding: "8px 14px",
-              borderRadius: 999,
-              border: "1px solid #00ffd0",
-              background: tab === "register" ? "#002f2a" : "transparent",
-              color: "#00ffd0",
-              cursor: "pointer",
-            }}
-          >
-            1️⃣ Register project
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("projects")}
-            style={{
-              padding: "8px 14px",
-              borderRadius: 999,
-              border: "1px solid #00ffd0",
-              background: tab === "projects" ? "#002f2a" : "transparent",
-              color: "#00ffd0",
-              cursor: "pointer",
-            }}
-          >
-            2️⃣ Approve & view projects ({totalRegistered})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("investor")}
-            style={{
-              padding: "8px 14px",
-              borderRadius: 999,
-              border: "1px solid #00ffd0",
-              background: tab === "investor" ? "#002f2a" : "transparent",
-              color: "#00ffd0",
-              cursor: "pointer",
-            }}
-          >
-            3️⃣ Investor / staking demo
-          </button>
+          <CounterCard label="projects registered" value={projectsRegistered} />
+          <CounterCard label="approved" value={projectsApproved} />
+          <CounterCard label="demo USDC staked" value={totalStaked} />
         </div>
 
-        {/* Small metrics strip */}
-        <div
-          style={{
-            display: "flex",
-            gap: 16,
-            marginBottom: 24,
-            flexWrap: "wrap",
-            fontSize: 13,
-          }}
-        >
-          <div
-            style={{
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "1px solid #333",
-              background: "rgba(0,0,0,0.6)",
-            }}
-          >
-            <strong>{totalRegistered}</strong> projects registered
-          </div>
-          <div
-            style={{
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "1px solid #333",
-              background: "rgba(0,0,0,0.6)",
-            }}
-          >
-            <strong>{totalApproved}</strong> approved
-          </div>
-          <div
-            style={{
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "1px solid #333",
-              background: "rgba(0,0,0,0.6)",
-            }}
-          >
-            <strong>{totalStakedAll}</strong> demo USDC staked
-          </div>
-        </div>
-
+        {/* Main two-column layout */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1.2fr)",
+            gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1.4fr)",
             gap: 24,
             alignItems: "flex-start",
           }}
         >
-          {/* LEFT SIDE – main tab content */}
-          <div>
-            {tab === "register" && (
-              <>
-                <h2 style={{ color: "#00ffd0", marginBottom: 8 }}>⚡ Protius Project Registration</h2>
-                <p style={{ color: "#9b9b9b", marginBottom: 24 }}>
-                  Register a renewable energy project and simulate the Protius lifecycle (developer
-                  → approval → staking).
+          {/* LEFT: Protius project registration */}
+          <div
+            style={{
+              background: "rgba(0,0,0,0.65)",
+              borderRadius: 12,
+              padding: 20,
+              border: "1px solid rgba(0,255,208,0.3)",
+            }}
+          >
+            <h3 style={{ marginTop: 0, color: "#00ffd0" }}>⚡ Protius Project Registration</h3>
+            <p style={{ marginTop: 4, marginBottom: 16, color: "#b3b3b3", fontSize: 13 }}>
+              Register a renewable energy project and simulate the Protius lifecycle
+              (developer → approval → staking).
+            </p>
+
+            {!addr ? (
+              <div
+                style={{
+                  borderRadius: 10,
+                  padding: 16,
+                  background: "#0f0f0f",
+                  border: "1px dashed #444",
+                  color: "#d0d0d0",
+                  marginTop: 4,
+                }}
+              >
+                <p style={{ marginBottom: 12 }}>
+                  <strong>Connect your Algorand wallet to begin.</strong>
                 </p>
-
-                {!addr ? (
-                  <div
-                    style={{
-                      border: "1px dashed #333",
-                      borderRadius: 12,
-                      padding: 24,
-                      background: "#0f0f0f",
-                      color: "#bcbcbc",
-                    }}
-                  >
-                    <p style={{ marginBottom: 12 }}>
-                      Connect your Algorand wallet to begin (use the wallet button in the header of
-                      the dApp).
-                    </p>
-                  </div>
-                ) : (
-                  <form
-                    onSubmit={handleRegisterProject}
-                    style={{ display: "grid", gap: 16, fontSize: 14 }}
-                  >
-                    <div style={{ display: "grid", gap: 6 }}>
-                      <span style={{ color: "#b9b9b9" }}>Developer Wallet</span>
-                      <div
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          background: "#111",
-                          border: "1px dashed #333",
-                          borderRadius: 8,
-                          color: "#a8ffea",
-                          fontSize: 12,
-                          wordBreak: "break-all",
-                        }}
-                      >
-                        {addr}
-                      </div>
-                    </div>
-
-                    <div style={{ display: "grid", gap: 6 }}>
-                      <label style={{ color: "#b9b9b9" }}>User Name</label>
-                      <input
-                        value={userName}
-                        onChange={(e) => setUserName(e.target.value)}
-                        placeholder="e.g., Giorgio Mauro"
-                        maxLength={80}
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          background: "#111",
-                          border: "1px solid #222",
-                          borderRadius: 8,
-                          color: "#eaeaea",
-                        }}
-                      />
-                    </div>
-
-                    <div style={{ display: "grid", gap: 6 }}>
-                      <label style={{ color: "#b9b9b9" }}>Project Name</label>
-                      <input
-                        value={projectName}
-                        onChange={(e) => setProjectName(e.target.value)}
-                        placeholder="e.g., Sunny Ridge Solar"
-                        maxLength={80}
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          background: "#111",
-                          border: "1px solid #222",
-                          borderRadius: 8,
-                          color: "#eaeaea",
-                        }}
-                      />
-                    </div>
-
-                    <div style={{ display: "grid", gap: 6 }}>
-                      <label style={{ color: "#b9b9b9" }}>Country</label>
-                      <select
-                        value={country}
-                        onChange={(e) => setCountry(e.target.value)}
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          background: "#111",
-                          border: "1px solid #222",
-                          borderRadius: 8,
-                          color: "#eaeaea",
-                        }}
-                      >
-                        <option value="">Select country…</option>
-                        {COUNTRIES.map((c) => (
-                          <option key={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                      <div style={{ display: "grid", gap: 6 }}>
-                        <label style={{ color: "#b9b9b9" }}>Capacity (kW)</label>
-                        <input
-                          type="number"
-                          min={1}
-                          step={1}
-                          value={capacityKw}
-                          onChange={(e) => setCapacityKw(e.target.value)}
-                          placeholder="e.g., 5000"
-                          style={{
-                            width: "100%",
-                            padding: "10px 12px",
-                            background: "#111",
-                            border: "1px solid #222",
-                            borderRadius: 8,
-                            color: "#eaeaea",
-                          }}
-                        />
-                      </div>
-                      <div style={{ display: "grid", gap: 6 }}>
-                        <label style={{ color: "#b9b9b9" }}>Distance from Substation (km)</label>
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.1}
-                          value={distanceKm}
-                          onChange={(e) => setDistanceKm(e.target.value)}
-                          placeholder="e.g., 12.5"
-                          style={{
-                            width: "100%",
-                            padding: "10px 12px",
-                            background: "#111",
-                            border: "1px solid #222",
-                            borderRadius: 8,
-                            color: "#eaeaea",
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ display: "grid", gap: 6 }}>
-                      <label style={{ color: "#b9b9b9" }}>Description / Notes</label>
-                      <textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Key details, permits/status, grid, site notes…"
-                        maxLength={3000}
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          background: "#111",
-                          border: "1px solid #222",
-                          borderRadius: 8,
-                          color: "#eaeaea",
-                          minHeight: 120,
-                          resize: "vertical",
-                        }}
-                      />
-                    </div>
-
+                <p style={{ marginBottom: 12, fontSize: 13, color: "#a5a5a5" }}>
+                  Use the <em>Connect wallet</em> button in the top-right (Pera Wallet via
+                  WalletConnect). Make sure your Pera app is switched to{" "}
+                  <strong>TestNet</strong>, not MainNet.
+                </p>
+                <div>
+                  {/* Extra explicit button: if you want to trigger Pera directly */}
+                  {peraProvider && (
                     <button
-                      type="submit"
+                      type="button"
+                      onClick={() => peraProvider.connect()}
                       style={{
-                        padding: "10px 14px",
-                        borderRadius: 10,
+                        padding: "8px 14px",
+                        borderRadius: 8,
                         border: "1px solid #00ffd0",
-                        background: "#002f2a",
+                        background: "rgba(0,255,208,0.06)",
                         color: "#00ffd0",
                         cursor: "pointer",
-                        width: 220,
-                        justifySelf: "start",
-                        fontWeight: 700,
+                        fontSize: 13,
                       }}
                     >
-                      Save project (demo only)
+                      Connect Pera wallet (TestNet)
                     </button>
-                  </form>
-                )}
-              </>
-            )}
-
-            {tab === "projects" && (
-              <>
-                <h2 style={{ color: "#00ffd0", marginBottom: 8 }}>📁 Projects overview</h2>
-                <p style={{ color: "#9b9b9b", marginBottom: 16 }}>
-                  These projects live only in the browser for demo purposes, but the flow mirrors
-                  what Protius will do on-chain.
-                </p>
-                {projects.length === 0 ? (
-                  <p style={{ color: "#b9b9b9" }}>No projects yet. Register one first.</p>
-                ) : (
-                  <div style={{ display: "grid", gap: 12 }}>
-                    {projects.map((p) => (
-                      <div
-                        key={p.id}
-                        style={{
-                          padding: 12,
-                          borderRadius: 10,
-                          border: "1px solid #333",
-                          background: "rgba(0,0,0,0.7)",
-                          fontSize: 13,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            gap: 8,
-                            marginBottom: 6,
-                          }}
-                        >
-                          <strong>{p.projectName}</strong>
-                          <span
-                            style={{
-                              padding: "2px 8px",
-                              borderRadius: 999,
-                              border: "1px solid #555",
-                              fontSize: 11,
-                              color: p.status === "Approved" ? "#00ffd0" : "#f5c542",
-                            }}
-                          >
-                            {p.status}
-                          </span>
-                        </div>
-                        <div style={{ marginBottom: 4, color: "#bdbdbd" }}>
-                          Dev: {p.userName} — {p.country || "N/A"} — {p.capacityKw} kW
-                        </div>
-                        <div style={{ marginBottom: 4, color: "#8a8a8a", fontSize: 12 }}>
-                          Substation distance: {p.distanceKm} km
-                        </div>
-                        {p.description && (
-                          <div style={{ marginBottom: 6, color: "#9b9b9b", fontSize: 12 }}>
-                            {p.description}
-                          </div>
-                        )}
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginTop: 4,
-                            fontSize: 12,
-                            color: "#bdbdbd",
-                          }}
-                        >
-                          <div>
-                            Staked (demo): <strong>{p.totalStaked}</strong> USDC —{" "}
-                            <strong>{p.stakerCount}</strong> stakers
-                          </div>
-                          {p.status === "Draft" && (
-                            <button
-                              type="button"
-                              onClick={() => handleApprove(p.id)}
-                              style={{
-                                padding: "6px 10px",
-                                borderRadius: 8,
-                                border: "1px solid #00ffd0",
-                                background: "#002f2a",
-                                color: "#00ffd0",
-                                cursor: "pointer",
-                                fontSize: 12,
-                              }}
-                            >
-                              Approve project
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            {tab === "investor" && (
-              <>
-                <h2 style={{ color: "#00ffd0", marginBottom: 8 }}>👥 Investor / staking demo</h2>
-                <p style={{ color: "#9b9b9b", marginBottom: 16 }}>
-                  Imagine you are a community investor. Here you can pick an approved project and
-                  simulate staking USDC into it.
-                </p>
-                {projects.filter((p) => p.status === "Approved").length === 0 ? (
-                  <p style={{ color: "#b9b9b9" }}>No approved projects yet.</p>
-                ) : (
-                  <>
-                    <div style={{ marginBottom: 10 }}>
-                      <label style={{ color: "#b9b9b9", fontSize: 13, marginRight: 8 }}>
-                        Stake amount (demo USDC)
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={stakeAmount}
-                        onChange={(e) => setStakeAmount(e.target.value)}
-                        style={{
-                          width: 160,
-                          padding: "6px 10px",
-                          background: "#111",
-                          border: "1px solid #222",
-                          borderRadius: 8,
-                          color: "#eaeaea",
-                          fontSize: 13,
-                        }}
-                      />
-                    </div>
-                    <div style={{ display: "grid", gap: 12 }}>
-                      {projects
-                        .filter((p) => p.status === "Approved")
-                        .map((p) => (
-                          <div
-                            key={p.id}
-                            style={{
-                              padding: 12,
-                              borderRadius: 10,
-                              border: "1px solid #333",
-                              background: "rgba(0,0,0,0.7)",
-                              fontSize: 13,
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                marginBottom: 6,
-                              }}
-                            >
-                              <strong>{p.projectName}</strong>
-                              <span style={{ fontSize: 12, color: "#bdbdbd" }}>
-                                {p.capacityKw} kW — {p.country}
-                              </span>
-                            </div>
-                            <div style={{ marginBottom: 6, fontSize: 12, color: "#9b9b9b" }}>
-                              Total demo staked: <strong>{p.totalStaked}</strong> USDC —{" "}
-                              <strong>{p.stakerCount}</strong> stakers
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleMockStake(p)}
-                              style={{
-                                padding: "8px 12px",
-                                borderRadius: 8,
-                                border: "1px solid #00ffd0",
-                                background: "#002f2a",
-                                color: "#00ffd0",
-                                cursor: "pointer",
-                                fontSize: 13,
-                              }}
-                            >
-                              Stake (demo only)
-                            </button>
-                          </div>
-                        ))}
-                    </div>
-                    <p
-                      style={{
-                        marginTop: 16,
-                        fontSize: 11,
-                        color: "#808080",
-                      }}
-                    >
-                      Note: this staking is <strong>front-end only</strong> for demo purposes. The
-                      only live on-chain call today is the HelloWorld contract on Algorand TestNet.
-                    </p>
-                  </>
-                )}
-              </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <ProjectForm
+                devAddr={addr}
+                onSubmit={async (data: any) => {
+                  // For now this is just UI logic: increment demo counter.
+                  setProjectsRegistered((n) => n + 1);
+                  console.log("Project registered (demo only, off-chain):", data);
+                }}
+              />
             )}
           </div>
 
-          {/* RIGHT SIDE – HelloWorld on-chain box */}
-          <aside
+          {/* RIGHT: HelloWorld smart contract box */}
+          <div
             style={{
+              background: "rgba(0,0,0,0.78)",
               borderRadius: 12,
-              border: "1px solid #333",
-              background: "rgba(0,0,0,0.7)",
-              padding: 16,
-              fontSize: 13,
+              padding: 20,
+              border: "1px solid rgba(0,255,208,0.35)",
             }}
           >
-            <h3 style={{ marginTop: 0, color: "#00ffd0" }}>HelloWorld on Algorand</h3>
-            <p style={{ color: "#b9b9b9", marginBottom: 10 }}>
-              This box talks to the real <strong>HelloWorld</strong> smart contract already deployed
-              on Algorand TestNet with app ID <code>{String(getHelloAppId())}</code>.
-            </p>
-            {!addr || !transactionSigner ? (
-              <p style={{ color: "#b9b9b9" }}>
-                Connect your wallet, then come back here to call the contract.
-              </p>
-            ) : (
-              <form onSubmit={handleHelloSubmit} style={{ display: "grid", gap: 10 }}>
-                <label style={{ color: "#b9b9b9" }}>
-                  Name to send:
-                  <input
-                    value={helloName}
-                    onChange={(e) => setHelloName(e.target.value)}
-                    placeholder="e.g., Giorgio"
-                    style={{
-                      marginTop: 4,
-                      width: "100%",
-                      padding: "8px 10px",
-                      background: "#111",
-                      border: "1px solid #222",
-                      borderRadius: 8,
-                      color: "#eaeaea",
-                    }}
-                  />
-                </label>
-                <button
-                  type="submit"
-                  disabled={helloLoading}
-                  style={{
-                    padding: "8px 10px",
-                    borderRadius: 8,
-                    border: "1px solid #00ffd0",
-                    background: helloLoading ? "#01352f" : "#002f2a",
-                    color: "#00ffd0",
-                    cursor: "pointer",
-                    fontWeight: 600,
-                  }}
-                >
-                  {helloLoading ? "Calling..." : "Call HelloWorld"}
-                </button>
-              </form>
-            )}
-            {helloError && (
-              <p style={{ marginTop: 10, color: "#ff9b9b" }}>Error: {helloError}</p>
-            )}
-            {helloResult && !helloError && (
-              <p style={{ marginTop: 10, color: "#a8ffea" }}>Response: {helloResult}</p>
-            )}
-            <hr style={{ borderColor: "#333", margin: "16px 0" }} />
-            <p style={{ color: "#808080", fontSize: 11 }}>
-              For this demo, the Protius project / staking flow on the left is{" "}
-              <strong>off-chain UI only</strong>. Next step is to replace HelloWorld with the real
-              Protius staking smart contract.
-            </p>
-          </aside>
+            <HelloWorldBox algorand={algorand} addr={addr} transactionSigner={transactionSigner} />
+          </div>
         </div>
 
+        {/* Footer */}
         <footer
           style={{
             marginTop: 32,
-            padding: "12px 0",
-            color: "#8a8a8a",
-            borderTop: "1px solid #222",
             textAlign: "center",
-            fontSize: 12,
+            fontSize: 11,
+            color: "#8a8a8a",
           }}
         >
           © 2025 Protius Protocol — Built on Algorand TestNet
         </footer>
       </div>
     </div>
+  );
+}
+
+// Small presentational components
+
+function StepPill(props: {
+  number: number;
+  label: string;
+  description: string;
+  active?: boolean;
+}) {
+  const { number, label, description, active } = props;
+  return (
+    <div
+      style={{
+        borderRadius: 999,
+        padding: "10px 16px",
+        border: active ? "1px solid #00ffd0" : "1px solid #1f2933",
+        background: active ? "rgba(0,255,208,0.08)" : "rgba(0,0,0,0.6)",
+        color: "#eaeaea",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        minWidth: 180,
+      }}
+    >
+      <span
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: "999px",
+          background: active ? "#00ffd0" : "#374151",
+          color: active ? "#020617" : "#e5e7eb",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 13,
+          fontWeight: 700,
+        }}
+      >
+        {number}
+      </span>
+      <div style={{ fontSize: 13 }}>
+        <div style={{ fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 11, color: "#9ca3af" }}>{description}</div>
+      </div>
+    </div>
+  );
+}
+
+function CounterCard(props: { label: string; value: number }) {
+  const { label, value } = props;
+  return (
+    <div
+      style={{
+        flex: "0 0 200px",
+        background: "rgba(0,0,0,0.7)",
+        borderRadius: 10,
+        padding: "10px 14px",
+        border: "1px solid rgba(15,118,110,0.8)",
+      }}
+    >
+      <div style={{ fontSize: 11, textTransform: "uppercase", color: "#9ca3af" }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: "#e5e7eb", marginTop: 2 }}>{value}</div>
+    </div>
+  );
+}
+
+type HelloWorldBoxProps = {
+  algorand: AlgorandClient;
+  addr: string | null;
+  transactionSigner: any;
+};
+
+function HelloWorldBox({ algorand, addr, transactionSigner }: HelloWorldBoxProps) {
+  const [name, setName] = useState("Giorgio");
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const appId = getHelloAppId();
+
+  async function handleCall() {
+    setError(null);
+    setResult(null);
+
+    if (!addr || !transactionSigner) {
+      setError("Please connect your TestNet wallet before calling the contract.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const client = new HelloWorldClient({
+        algorand,
+        appId,
+        defaultSender: addr,
+        defaultSigner: transactionSigner,
+      });
+
+      const res = await client.send.hello({
+        args: { name },
+      });
+
+      const returned = res.return as string | undefined;
+      setResult(returned ?? "No response value returned");
+    } catch (err: any) {
+      console.error("Error calling HelloWorld:", err);
+      const msg =
+        err?.message ??
+        (typeof err === "string" ? err : "Failed to call HelloWorld. See console for details.");
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <>
+      <h3 style={{ marginTop: 0, color: "#00ffd0" }}>HelloWorld on Algorand</h3>
+      <p style={{ marginTop: 4, marginBottom: 12, color: "#c4c4c4", fontSize: 13 }}>
+        This box talks to the real <strong>HelloWorld</strong> smart contract already deployed on
+        Algorand TestNet with app ID <code>{String(appId)}</code>.
+      </p>
+      <p style={{ marginTop: 0, marginBottom: 16, color: "#9ca3af", fontSize: 12 }}>
+        Connect your wallet, then call the contract to see the response below.
+      </p>
+
+      <label style={{ fontSize: 12, color: "#d1d5db", display: "block", marginBottom: 4 }}>
+        Name to send:
+      </label>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="e.g., Giorgio"
+        style={{
+          width: "100%",
+          padding: "8px 10px",
+          borderRadius: 8,
+          border: "1px solid #374151",
+          background: "#020617",
+          color: "#e5e7eb",
+          marginBottom: 12,
+          fontSize: 13,
+        }}
+      />
+
+      <button
+        type="button"
+        onClick={handleCall}
+        disabled={loading}
+        style={{
+          width: "100%",
+          padding: "9px 14px",
+          borderRadius: 999,
+          border: "1px solid #00ffd0",
+          background: loading ? "rgba(0,255,208,0.2)" : "rgba(0,255,208,0.08)",
+          color: "#00ffd0",
+          fontWeight: 600,
+          cursor: loading ? "default" : "pointer",
+          marginBottom: 12,
+        }}
+      >
+        {loading ? "Calling HelloWorld..." : "Call HelloWorld"}
+      </button>
+
+      {result && (
+        <div
+          style={{
+            marginTop: 4,
+            padding: "8px 10px",
+            borderRadius: 8,
+            background: "rgba(16,185,129,0.12)",
+            border: "1px solid rgba(16,185,129,0.5)",
+            fontSize: 12,
+          }}
+        >
+          ✅ <strong>Received:</strong> {result}
+        </div>
+      )}
+
+      {error && (
+        <div
+          style={{
+            marginTop: 4,
+            padding: "8px 10px",
+            borderRadius: 8,
+            background: "rgba(248,113,113,0.12)",
+            border: "1px solid rgba(248,113,113,0.6)",
+            fontSize: 12,
+          }}
+        >
+          ❌ <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      <p style={{ marginTop: 16, fontSize: 11, color: "#9ca3af" }}>
+        For this demo, the Protius project / staking flow on the left is off-chain UI only. Next step
+        is to replace HelloWorld with the real Protius staking smart contract.
+      </p>
+    </>
   );
 }
