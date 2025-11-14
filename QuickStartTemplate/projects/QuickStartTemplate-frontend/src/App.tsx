@@ -1,26 +1,8 @@
-import { Outlet } from "react-router-dom";
-import { Wallet } from "@txnlab/use-wallet";
 import "./App.css";
+import Home from "./Home";
 
 function App() {
-  return (
-    <div className="app-container">
-      <header className="app-header">
-        <div className="logo-area">
-          <span className="logo-text">⚡ Protius Protocol</span>
-        </div>
-
-        <div className="wallet-area">
-          {/* THIS IS THE BUTTON YOU NEED */}
-          <Wallet />
-        </div>
-      </header>
-
-      <main>
-        <Outlet />
-      </main>
-    </div>
-  );
+  return <Home />;
 }
 
 export default App;
