@@ -21,23 +21,52 @@ interface Project {
 
 function getHelloAppId(): bigint {
   const raw = import.meta.env.VITE_HELLO_APP_ID as string | undefined;
-  if (!raw) throw new Error("VITE_HELLO_APP_ID is not set in your environment.");
+  if (!raw)
+    throw new Error("VITE_HELLO_APP_ID is not set in your environment.");
   return BigInt(raw);
 }
 
 const COUNTRIES = ["Italy", "France", "South Africa", "Canada"];
 
 export default function Home() {
-  const { activeAccount, transactionSigner } = useWallet();
+  const { activeAccount, transactionSigner, wallets } = useWallet();
   const addr = activeAccount?.address ?? null;
 
+  // --- connect / disconnect handlers ---
+  const handleConnectWallet = async () => {
+    try {
+      // For the demo: just connect the first configured wallet (Pera/Defly/Exodus)
+      const firstWallet = wallets[0];
+      if (!firstWallet) {
+        alert("No wallets configured in WalletProvider.");
+        return;
+      }
+      await firstWallet.connect();
+    } catch (err) {
+      console.error("Error connecting wallet", err);
+    }
+  };
+
+  const handleDisconnectWallet = async () => {
+    try {
+      await Promise.all(wallets.map((w) => w.disconnect()));
+    } catch (err) {
+      console.error("Error disconnecting wallet(s)", err);
+    }
+  };
+
+  // --- HelloWorld on-chain state ---
   const [helloName, setHelloName] = useState("");
   const [helloResult, setHelloResult] = useState<string | null>(null);
   const [helloLoading, setHelloLoading] = useState(false);
   const [helloError, setHelloError] = useState<string | null>(null);
 
-  const [tab, setTab] = useState<"register" | "projects" | "investor">("register");
+  // --- UI tabs ---
+  const [tab, setTab] = useState<"register" | "projects" | "investor">(
+    "register",
+  );
 
+  // --- Project registration form ---
   const [userName, setUserName] = useState("");
   const [projectName, setProjectName] = useState("");
   const [country, setCountry] = useState("");
@@ -45,9 +74,11 @@ export default function Home() {
   const [distanceKm, setDistanceKm] = useState("");
   const [description, setDescription] = useState("");
 
+  // --- Projects state (demo only, in-memory) ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [nextProjectId, setNextProjectId] = useState(1);
 
+  // --- Investor stake demo ---
   const [stakeAmount, setStakeAmount] = useState("");
 
   const algorand = useMemo(() => AlgorandClient.fromEnvironment(), []);
@@ -159,7 +190,14 @@ export default function Home() {
         color: "#eaeaea",
       }}
     >
-      <div style={{ padding: 24, maxWidth: 1000, margin: "0 auto", backdropFilter: "blur(3px)" }}>
+      <div
+        style={{
+          padding: 24,
+          maxWidth: 1000,
+          margin: "0 auto",
+          backdropFilter: "blur(3px)",
+        }}
+      >
         <header
           style={{
             display: "flex",
@@ -168,12 +206,67 @@ export default function Home() {
             marginBottom: 24,
           }}
         >
-          <h1 style={{ color: "#00ffd0", margin: 0 }}>⚡ Protius Protocol – Demo</h1>
-          <div style={{ fontSize: 12, color: "#bdbdbd", textAlign: "right" }}>
+          <h1 style={{ color: "#00ffd0", margin: 0 }}>
+            ⚡ Protius Protocol – Demo
+          </h1>
+          <div
+            style={{
+              fontSize: 12,
+              color: "#bdbdbd",
+              textAlign: "right",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              alignItems: "flex-end",
+            }}
+          >
             <div>Network: TestNet</div>
-            <div style={{ maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis" }}>
-              Wallet: {addr ?? "Not connected"}
-            </div>
+            {addr ? (
+              <>
+                <div
+                  style={{
+                    maxWidth: 260,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {addr}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDisconnectWallet}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 999,
+                    border: "1px solid #ff9b9b",
+                    background: "transparent",
+                    color: "#ff9b9b",
+                    cursor: "pointer",
+                    fontSize: 11,
+                  }}
+                >
+                  Disconnect
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleConnectWallet}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  border: "1px solid #00ffd0",
+                  background: "#002f2a",
+                  color: "#00ffd0",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                Connect wallet
+              </button>
+            )}
           </div>
         </header>
 
@@ -283,10 +376,12 @@ export default function Home() {
           <div>
             {tab === "register" && (
               <>
-                <h2 style={{ color: "#00ffd0", marginBottom: 8 }}>⚡ Protius Project Registration</h2>
+                <h2 style={{ color: "#00ffd0", marginBottom: 8 }}>
+                  ⚡ Protius Project Registration
+                </h2>
                 <p style={{ color: "#9b9b9b", marginBottom: 24 }}>
-                  Register a renewable energy project and simulate the Protius lifecycle (developer
-                  → approval → staking).
+                  Register a renewable energy project and simulate the Protius
+                  lifecycle (developer → approval → staking).
                 </p>
 
                 {!addr ? (
@@ -300,8 +395,8 @@ export default function Home() {
                     }}
                   >
                     <p style={{ marginBottom: 12 }}>
-                      Connect your Algorand wallet to begin (use the wallet button in the header of
-                      the dApp).
+                      Connect your Algorand wallet to begin (use the{" "}
+                      <strong>Connect wallet</strong> button in the header).
                     </p>
                   </div>
                 ) : (
@@ -384,9 +479,17 @@ export default function Home() {
                       </select>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 16,
+                      }}
+                    >
                       <div style={{ display: "grid", gap: 6 }}>
-                        <label style={{ color: "#b9b9b9" }}>Capacity (kW)</label>
+                        <label style={{ color: "#b9b9b9" }}>
+                          Capacity (kW)
+                        </label>
                         <input
                           type="number"
                           min={1}
@@ -405,7 +508,9 @@ export default function Home() {
                         />
                       </div>
                       <div style={{ display: "grid", gap: 6 }}>
-                        <label style={{ color: "#b9b9b9" }}>Distance from Substation (km)</label>
+                        <label style={{ color: "#b9b9b9" }}>
+                          Distance from Substation (km)
+                        </label>
                         <input
                           type="number"
                           min={0}
@@ -426,7 +531,9 @@ export default function Home() {
                     </div>
 
                     <div style={{ display: "grid", gap: 6 }}>
-                      <label style={{ color: "#b9b9b9" }}>Description / Notes</label>
+                      <label style={{ color: "#b9b9b9" }}>
+                        Description / Notes
+                      </label>
                       <textarea
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
@@ -468,13 +575,17 @@ export default function Home() {
 
             {tab === "projects" && (
               <>
-                <h2 style={{ color: "#00ffd0", marginBottom: 8 }}>📁 Projects overview</h2>
+                <h2 style={{ color: "#00ffd0", marginBottom: 8 }}>
+                  📁 Projects overview
+                </h2>
                 <p style={{ color: "#9b9b9b", marginBottom: 16 }}>
-                  These projects live only in the browser for demo purposes, but the flow mirrors
-                  what Protius will do on-chain.
+                  These projects live only in the browser for demo purposes,
+                  but the flow mirrors what Protius will do on-chain.
                 </p>
                 {projects.length === 0 ? (
-                  <p style={{ color: "#b9b9b9" }}>No projects yet. Register one first.</p>
+                  <p style={{ color: "#b9b9b9" }}>
+                    No projects yet. Register one first.
+                  </p>
                 ) : (
                   <div style={{ display: "grid", gap: 12 }}>
                     {projects.map((p) => (
@@ -503,20 +614,38 @@ export default function Home() {
                               borderRadius: 999,
                               border: "1px solid #555",
                               fontSize: 11,
-                              color: p.status === "Approved" ? "#00ffd0" : "#f5c542",
+                              color:
+                                p.status === "Approved"
+                                  ? "#00ffd0"
+                                  : "#f5c542",
                             }}
                           >
                             {p.status}
                           </span>
                         </div>
-                        <div style={{ marginBottom: 4, color: "#bdbdbd" }}>
-                          Dev: {p.userName} — {p.country || "N/A"} — {p.capacityKw} kW
+                        <div
+                          style={{ marginBottom: 4, color: "#bdbdbd" }}
+                        >
+                          Dev: {p.userName} — {p.country || "N/A"} —{" "}
+                          {p.capacityKw} kW
                         </div>
-                        <div style={{ marginBottom: 4, color: "#8a8a8a", fontSize: 12 }}>
+                        <div
+                          style={{
+                            marginBottom: 4,
+                            color: "#8a8a8a",
+                            fontSize: 12,
+                          }}
+                        >
                           Substation distance: {p.distanceKm} km
                         </div>
                         {p.description && (
-                          <div style={{ marginBottom: 6, color: "#9b9b9b", fontSize: 12 }}>
+                          <div
+                            style={{
+                              marginBottom: 6,
+                              color: "#9b9b9b",
+                              fontSize: 12,
+                            }}
+                          >
                             {p.description}
                           </div>
                         )}
@@ -531,8 +660,8 @@ export default function Home() {
                           }}
                         >
                           <div>
-                            Staked (demo): <strong>{p.totalStaked}</strong> USDC —{" "}
-                            <strong>{p.stakerCount}</strong> stakers
+                            Staked (demo): <strong>{p.totalStaked}</strong>{" "}
+                            USDC — <strong>{p.stakerCount}</strong> stakers
                           </div>
                           {p.status === "Draft" && (
                             <button
@@ -561,17 +690,28 @@ export default function Home() {
 
             {tab === "investor" && (
               <>
-                <h2 style={{ color: "#00ffd0", marginBottom: 8 }}>👥 Investor / staking demo</h2>
+                <h2 style={{ color: "#00ffd0", marginBottom: 8 }}>
+                  👥 Investor / staking demo
+                </h2>
                 <p style={{ color: "#9b9b9b", marginBottom: 16 }}>
-                  Imagine you are a community investor. Here you can pick an approved project and
-                  simulate staking USDC into it.
+                  Imagine you are a community investor. Here you can pick an
+                  approved project and simulate staking USDC into it.
                 </p>
-                {projects.filter((p) => p.status === "Approved").length === 0 ? (
-                  <p style={{ color: "#b9b9b9" }}>No approved projects yet.</p>
+                {projects.filter((p) => p.status === "Approved").length ===
+                0 ? (
+                  <p style={{ color: "#b9b9b9" }}>
+                    No approved projects yet.
+                  </p>
                 ) : (
                   <>
                     <div style={{ marginBottom: 10 }}>
-                      <label style={{ color: "#b9b9b9", fontSize: 13, marginRight: 8 }}>
+                      <label
+                        style={{
+                          color: "#b9b9b9",
+                          fontSize: 13,
+                          marginRight: 8,
+                        }}
+                      >
                         Stake amount (demo USDC)
                       </label>
                       <input
@@ -613,12 +753,24 @@ export default function Home() {
                               }}
                             >
                               <strong>{p.projectName}</strong>
-                              <span style={{ fontSize: 12, color: "#bdbdbd" }}>
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  color: "#bdbdbd",
+                                }}
+                              >
                                 {p.capacityKw} kW — {p.country}
                               </span>
                             </div>
-                            <div style={{ marginBottom: 6, fontSize: 12, color: "#9b9b9b" }}>
-                              Total demo staked: <strong>{p.totalStaked}</strong> USDC —{" "}
+                            <div
+                              style={{
+                                marginBottom: 6,
+                                fontSize: 12,
+                                color: "#9b9b9b",
+                              }}
+                            >
+                              Total demo staked:{" "}
+                              <strong>{p.totalStaked}</strong> USDC —{" "}
                               <strong>{p.stakerCount}</strong> stakers
                             </div>
                             <button
@@ -646,8 +798,10 @@ export default function Home() {
                         color: "#808080",
                       }}
                     >
-                      Note: this staking is <strong>front-end only</strong> for demo purposes. The
-                      only live on-chain call today is the HelloWorld contract on Algorand TestNet.
+                      Note: this staking is{" "}
+                      <strong>front-end only</strong> for demo purposes.
+                      The only live on-chain call today is the HelloWorld
+                      contract on Algorand TestNet.
                     </p>
                   </>
                 )}
@@ -665,17 +819,25 @@ export default function Home() {
               fontSize: 13,
             }}
           >
-            <h3 style={{ marginTop: 0, color: "#00ffd0" }}>HelloWorld on Algorand</h3>
+            <h3 style={{ marginTop: 0, color: "#00ffd0" }}>
+              HelloWorld on Algorand
+            </h3>
             <p style={{ color: "#b9b9b9", marginBottom: 10 }}>
-              This box talks to the real <strong>HelloWorld</strong> smart contract already deployed
-              on Algorand TestNet with app ID <code>{String(getHelloAppId())}</code>.
+              This box talks to the real{" "}
+              <strong>HelloWorld</strong> smart contract already deployed
+              on Algorand TestNet with app ID{" "}
+              <code>{String(getHelloAppId())}</code>.
             </p>
             {!addr || !transactionSigner ? (
               <p style={{ color: "#b9b9b9" }}>
-                Connect your wallet, then come back here to call the contract.
+                Connect your wallet, then come back here to call the
+                contract.
               </p>
             ) : (
-              <form onSubmit={handleHelloSubmit} style={{ display: "grid", gap: 10 }}>
+              <form
+                onSubmit={handleHelloSubmit}
+                style={{ display: "grid", gap: 10 }}
+              >
                 <label style={{ color: "#b9b9b9" }}>
                   Name to send:
                   <input
@@ -711,16 +873,21 @@ export default function Home() {
               </form>
             )}
             {helloError && (
-              <p style={{ marginTop: 10, color: "#ff9b9b" }}>Error: {helloError}</p>
+              <p style={{ marginTop: 10, color: "#ff9b9b" }}>
+                Error: {helloError}
+              </p>
             )}
             {helloResult && !helloError && (
-              <p style={{ marginTop: 10, color: "#a8ffea" }}>Response: {helloResult}</p>
+              <p style={{ marginTop: 10, color: "#a8ffea" }}>
+                Response: {helloResult}
+              </p>
             )}
             <hr style={{ borderColor: "#333", margin: "16px 0" }} />
             <p style={{ color: "#808080", fontSize: 11 }}>
-              For this demo, the Protius project / staking flow on the left is{" "}
-              <strong>off-chain UI only</strong>. Next step is to replace HelloWorld with the real
-              Protius staking smart contract.
+              For this demo, the Protius project / staking flow on the left
+              is <strong>off-chain UI only</strong>. The next step is to
+              replace HelloWorld with the real Protius staking smart
+              contract.
             </p>
           </aside>
         </div>
