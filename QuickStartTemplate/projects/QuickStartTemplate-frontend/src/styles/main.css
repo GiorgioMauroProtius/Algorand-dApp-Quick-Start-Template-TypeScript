@@ -1,3 +1,29 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ===== Protius Background Image ===== */
+
+body {
+  margin: 0;
+  padding: 0;
+  background-image: url('/protius-bg.jpg'); /* change filename if needed */
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-position: center 90%; /* 90% vertical center as before */
+  background-color: #000; /* fallback */
+}
+
+/* Subtle dark overlay for readability */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  z-index: -1;
+}
