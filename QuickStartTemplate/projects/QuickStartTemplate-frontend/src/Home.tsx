@@ -129,7 +129,7 @@ const Home: React.FC = () => {
 
         {/* Header + tabs + metrics */}
         <header className="space-y-4 border-b border-emerald-500/40 pb-4
-        bg-black/40 backdrop-blur-sm rounded-xl p-4 shadow-lg">
+        bg-black/50 backdrop-blur-sm rounded-xl p-4 shadow-lg">
           <div className="space-y-2">
             <h1 className="text-2xl md:text-3xl font-semibold text-emerald-300">
               ⚡ Protius Protocol — Demo
