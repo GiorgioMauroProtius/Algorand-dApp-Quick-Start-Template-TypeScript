@@ -215,6 +215,12 @@ const COUNTRIES = [
 const Home: React.FC = () => {
   const { activeAddress } = useWallet();
 
+  // --- Modal helpers required by ConnectWallet and AppCalls types ---
+  // For this demo we don't actually show a modal, so these are safe no-ops.
+  const openModal = (_config?: any) => {};
+  const closeModal = () => {};
+  const setModalState = (_state: any) => {};
+
   // --- Project registration state ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [developerWallet, setDeveloperWallet] = useState("");
@@ -226,7 +232,7 @@ const Home: React.FC = () => {
   const [notes, setNotes] = useState("");
   const [showChecklist, setShowChecklist] = useState(false);
 
-  // Extended developer checklist fields (just kept as text, demo only)
+  // Extended developer checklist fields
   const [landStatus, setLandStatus] = useState("");
   const [landZoning, setLandZoning] = useState("");
   const [permitting, setPermitting] = useState("");
@@ -291,7 +297,7 @@ const Home: React.FC = () => {
 
     setProjects((prev) => [...prev, newProject]);
 
-    // reset light fields but keep some context
+    // reset fields
     setDeveloperWallet("");
     setUserName("");
     setProjectName("");
@@ -369,16 +375,14 @@ const Home: React.FC = () => {
               {activeAddress && (
                 <p className="text-xs md:text-sm text-emerald-200/90 break-all">
                   Connected wallet:{" "}
-                  <span className="font-mono">
-                    {activeAddress}
-                  </span>
+                  <span className="font-mono">{activeAddress}</span>
                 </p>
               )}
             </div>
 
             <div className="self-start">
               {/* Top-right connect / disconnect button */}
-              <ConnectWallet />
+              <ConnectWallet openModal={openModal} closeModal={closeModal} />
             </div>
           </div>
 
@@ -758,7 +762,7 @@ const Home: React.FC = () => {
               </p>
 
               <div className="mt-2">
-                <AppCalls />
+                <AppCalls openModal={openModal} setModalState={setModalState} />
               </div>
             </section>
           </div>
