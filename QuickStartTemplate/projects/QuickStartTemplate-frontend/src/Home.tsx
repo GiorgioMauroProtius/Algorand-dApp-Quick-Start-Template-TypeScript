@@ -215,6 +215,15 @@ const COUNTRIES = [
 const Home: React.FC = () => {
   const { activeAddress } = useWallet();
 
+  // --- Modal state used by ConnectWallet + AppCalls ---
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const openModal = () => setIsModalOpen(true);        // for ConnectWallet
+  const closeModal = () => setIsModalOpen(false);       // for ConnectWallet
+  const setModalState = (value: boolean) => {           // for AppCalls
+    setIsModalOpen(value);
+  };
+
   // Scroll refs for steps 1 / 2 / 3
   const registrationRef = useRef<HTMLDivElement | null>(null);
   const approvalRef = useRef<HTMLDivElement | null>(null);
@@ -424,7 +433,7 @@ const Home: React.FC = () => {
 
             <div className="self-start">
               {/* Top-right connect / disconnect button */}
-              <ConnectWallet />
+              <ConnectWallet openModal={openModal} closeModal={closeModal} />
             </div>
           </div>
 
@@ -956,7 +965,8 @@ const Home: React.FC = () => {
             </p>
 
             <div className="mt-2">
-              <AppCalls />
+              {/* Here AppCalls expects: openModal: boolean; setModalState: (value: boolean) => void */}
+              <AppCalls openModal={isModalOpen} setModalState={setModalState} />
             </div>
           </section>
         </div>
