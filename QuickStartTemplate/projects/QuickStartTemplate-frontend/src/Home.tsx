@@ -357,7 +357,7 @@ const Home: React.FC = () => {
   const firstApprovedProject = projects.find((p) => p.isApproved) ?? null;
 
   return (
-    <div className="min-h-screen bg-black/70 text-slate-100">
+    <div className="min-h-screen bg-black/60 text-slate-100">
       <div className="max-w-6xl mx-auto px-4 py-8 md:py-12 space-y-8">
         {/* Header + wallet + metrics */}
         <header className="space-y-4 border-b border-emerald-500/40 pb-4 bg-black/60 backdrop-blur-sm rounded-xl p-4 md:p-6 shadow-lg">
@@ -523,13 +523,17 @@ const Home: React.FC = () => {
                 className="inline-flex items-center gap-2 rounded-full border border-emerald-500/60 bg-slate-900/80 px-3 py-1.5 text-xs text-emerald-100 hover:bg-slate-900"
                 onClick={() => setShowChecklist((prev) => !prev)}
               >
-                <span>{showChecklist ? "▴ Hide" : "▾ Show"} Developer Checklist</span>
+                <span>
+                  {showChecklist ? "▴ Hide" : "▾ Show"} Developer Checklist
+                </span>
               </button>
 
               {showChecklist && (
                 <div className="mt-3 grid md:grid-cols-2 gap-4 text-xs">
                   <div>
-                    <label className="block mb-1 text-emerald-100">Land status</label>
+                    <label className="block mb-1 text-emerald-100">
+                      Land status
+                    </label>
                     <input
                       className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                       value={landStatus}
@@ -537,7 +541,9 @@ const Home: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block mb-1 text-emerald-100">Land zoning</label>
+                    <label className="block mb-1 text-emerald-100">
+                      Land zoning
+                    </label>
                     <input
                       className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                       value={landZoning}
@@ -556,7 +562,9 @@ const Home: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block mb-1 text-emerald-100">Insurances</label>
+                    <label className="block mb-1 text-emerald-100">
+                      Insurances
+                    </label>
                     <textarea
                       className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                       rows={2}
@@ -565,7 +573,9 @@ const Home: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block mb-1 text-emerald-100">Contracts</label>
+                    <label className="block mb-1 text-emerald-100">
+                      Contracts
+                    </label>
                     <textarea
                       className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                       rows={2}
@@ -608,7 +618,9 @@ const Home: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block mb-1 text-emerald-100">Currency</label>
+                      <label className="block mb-1 text-emerald-100">
+                        Currency
+                      </label>
                       <select
                         className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                         value={currency}
@@ -621,7 +633,9 @@ const Home: React.FC = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="block mb-1 text-emerald-100">Debt ratio (%)</label>
+                      <label className="block mb-1 text-emerald-100">
+                        Debt ratio (%)
+                      </label>
                       <input
                         className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                         value={debtRatio}
@@ -650,7 +664,9 @@ const Home: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block mb-1 text-emerald-100">Expected COD date</label>
+                    <label className="block mb-1 text-emerald-100">
+                      Expected COD date
+                    </label>
                     <input
                       type="date"
                       className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
@@ -755,7 +771,8 @@ const Home: React.FC = () => {
                 </h2>
               </div>
               <p className="text-xs text-emerald-100/80">
-                This panel talks to the live <span className="font-semibold">HelloWorld</span>{" "}
+                This panel talks to the live{" "}
+                <span className="font-semibold">HelloWorld</span>{" "}
                 smart contract already deployed on Algorand TestNet. For now it
                 returns a simple response; next we replace this with the Protius
                 staking contract.
@@ -769,8 +786,8 @@ const Home: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <footer className="pt-4">
-          <p className="text-white/85 text-xs text-center drop-shadow-md bg-black/40 inline-block px-3 py-1 rounded-full mx-auto">
+        <footer className="pt-4 text-center">
+          <p className="text-white/90 text-xs inline-block bg-black/60 px-4 py-1.5 rounded-full shadow-md">
             Protius Protocol — Built on Algorand TestNet.
           </p>
         </footer>
