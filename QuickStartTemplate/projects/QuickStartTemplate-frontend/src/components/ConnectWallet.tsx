@@ -11,19 +11,31 @@ interface ConnectWalletProps {
 const ConnectWallet: React.FC<ConnectWalletProps> = () => {
   const { wallets, activeAddress } = useWallet();
 
+  // Prefer an already-active wallet first
   const activeWallet = wallets.find((w) => w.isActive);
-  const defaultWallet = activeWallet ?? wallets[0];
+
+  // Then prefer PERA if it's one of the configured wallets
+  const peraWallet =
+    wallets.find((w) =>
+      w.metadata?.name?.toLowerCase().includes("pera"),
+    ) ?? wallets.find((w) => (w as any).id === "pera");
+
+  // Fallback to the first wallet in the list
+  const defaultWallet = activeWallet ?? peraWallet ?? wallets[0];
 
   const handleConnect = async () => {
     if (!defaultWallet) {
       alert("No wallet providers are configured.");
       return;
     }
+
     try {
       await defaultWallet.connect();
     } catch (err) {
       console.error("Error connecting wallet", err);
-      alert("Could not connect wallet. Please check your wallet extension.");
+      alert(
+        "Could not connect wallet. Please check that your wallet (Pera / Defly) is installed and unlocked.",
+      );
     }
   };
 
