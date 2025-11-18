@@ -589,13 +589,17 @@ const Home: React.FC = () => {
               className="inline-flex items-center gap-2 rounded-full border border-emerald-500/60 bg-slate-900/80 px-3 py-1.5 text-xs text-emerald-100 hover:bg-slate-900"
               onClick={() => setShowChecklist((prev) => !prev)}
             >
-              <span>{showChecklist ? "▴ Hide" : "▾ Show"} developer checklist</span>
+              <span>
+                {showChecklist ? "▴ Hide" : "▾ Show"} developer checklist
+              </span>
             </button>
 
             {showChecklist && (
               <div className="mt-3 grid md:grid-cols-2 gap-4 text-xs">
                 <div>
-                  <label className="block mb-1 text-emerald-100">Land status</label>
+                  <label className="block mb-1 text-emerald-100">
+                    Land status
+                  </label>
                   <select
                     className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                     value={landStatus}
@@ -608,7 +612,9 @@ const Home: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block mb-1 text-emerald-100">Land zoning</label>
+                  <label className="block mb-1 text-emerald-100">
+                    Land zoning
+                  </label>
                   <select
                     className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                     value={landZoning}
@@ -633,7 +639,9 @@ const Home: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block mb-1 text-emerald-100">Insurances</label>
+                  <label className="block mb-1 text-emerald-100">
+                    Insurances
+                  </label>
                   <textarea
                     className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                     rows={2}
@@ -642,7 +650,9 @@ const Home: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block mb-1 text-emerald-100">Contracts</label>
+                  <label className="block mb-1 text-emerald-100">
+                    Contracts
+                  </label>
                   <textarea
                     className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                     rows={2}
@@ -686,7 +696,9 @@ const Home: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block mb-1 text-emerald-100">Currency</label>
+                    <label className="block mb-1 text-emerald-100">
+                      Currency
+                    </label>
                     <select
                       className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                       value={currency}
@@ -699,7 +711,9 @@ const Home: React.FC = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block mb-1 text-emerald-100">Debt ratio (%)</label>
+                    <label className="block mb-1 text-emerald-100">
+                      Debt ratio (%)
+                    </label>
                     <input
                       className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                       value={debtRatio}
@@ -729,7 +743,9 @@ const Home: React.FC = () => {
                       onClick={() => setAutoEquity((v) => !v)}
                       className="text-[10px] underline text-emerald-300 hover:text-emerald-200"
                     >
-                      {autoEquity ? "Switch to manual input" : "Auto-calculate"}
+                      {autoEquity
+                        ? "Switch to manual input"
+                        : "Auto-calculate"}
                     </button>
                   </div>
                   <input
@@ -788,8 +804,8 @@ const Home: React.FC = () => {
 
           {projects.length === 0 ? (
             <p className="text-xs text-emerald-200/70">
-              No projects yet. Submit at least one project above to populate this
-              table.
+              No projects yet. Submit at least one project above to populate
+              this table.
             </p>
           ) : (
             <div className="space-y-2">
@@ -809,8 +825,8 @@ const Home: React.FC = () => {
                         )}
                       </div>
                       <div className="text-emerald-200/80 truncate">
-                        {p.capacity} — {p.country} — {p.distanceKm || "n/a"} km to
-                        substation
+                        {p.capacity} — {p.country} — {p.distanceKm || "n/a"} km
+                        to substation
                       </div>
                       {p.userName && (
                         <div className="text-emerald-200/70">
@@ -832,8 +848,8 @@ const Home: React.FC = () => {
                         {p.isApproved ? "Approved" : "Approve"}
                       </button>
                       <div className="text-[10px] text-emerald-200/80">
-                        Demo staked: {p.totalStaked.toFixed(2)} USDC — {p.stakers}{" "}
-                        stakers
+                        Demo staked: {p.totalStaked.toFixed(2)} USDC —{" "}
+                        {p.stakers} stakers
                       </div>
                     </div>
                   </div>
@@ -935,8 +951,25 @@ const Home: React.FC = () => {
               response; next we replace this with the Protius staking contract.
             </p>
 
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setModalState(true)}
+                className="rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold px-4 py-2 shadow-lg shadow-emerald-500/30"
+              >
+                Open HelloWorld demo
+              </button>
+              <span className="text-[11px] text-emerald-200/80">
+                Opens a dialog that deploys and calls the TestNet HelloWorld
+                contract.
+              </span>
+            </div>
+
             <div className="mt-2">
-              <AppCalls openModal={isModalOpen} setModalState={setModalState} />
+              <AppCalls
+                openModal={isModalOpen}
+                setModalState={setModalState}
+              />
             </div>
           </section>
         </div>
