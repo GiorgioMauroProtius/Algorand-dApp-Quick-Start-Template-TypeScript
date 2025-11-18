@@ -936,7 +936,7 @@ const Home: React.FC = () => {
             </p>
 
             <div className="mt-2">
-              <AppCalls openModal={openModal} setModalState={setModalState} />
+              <AppCalls openModal={isModalOpen} setModalState={setModalState} />
             </div>
           </section>
         </div>
