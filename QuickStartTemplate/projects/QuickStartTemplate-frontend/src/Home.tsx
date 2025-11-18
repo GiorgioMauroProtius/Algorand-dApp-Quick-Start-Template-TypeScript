@@ -15,6 +15,9 @@ type Project = {
   isApproved: boolean;
   totalStaked: number;
   stakers: number;
+  devCap?: string;
+  equity?: string;
+  debtRatioValue?: string;
 };
 
 const COUNTRIES = [
@@ -256,6 +259,21 @@ const Home: React.FC = () => {
 
   const [stakeAmountInput, setStakeAmountInput] = useState("");
 
+  const formatLargeNumber = (value: string) => {
+    if (!value) return "";
+    const cleaned = value.replace(/,/g, "").replace(/\s/g, "");
+    const num = Number(cleaned.replace(",", "."));
+    if (isNaN(num)) return value;
+    return num.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  };
+
+  const formatStake = (value: number) => {
+    return value.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
   useEffect(() => {
     if (activeAddress && !developerWallet) {
       setDeveloperWallet(activeAddress);
@@ -308,10 +326,10 @@ const Home: React.FC = () => {
       approvals && `Pre-construction approvals: ${approvals}`,
       (devCapRequired || equityRequired || debtRatio || codDate) &&
         `Financials (${currency}) – Dev cap: ${
-          devCapRequired || "n/a"
-        }, Equity: ${equityRequired || "n/a"}, Debt ratio: ${
-          debtRatio || "n/a"
-        }%, COD: ${codDate || "n/a"}`,
+          devCapRequired ? formatLargeNumber(devCapRequired) : "n/a"
+        }, Equity: ${
+          equityRequired ? formatLargeNumber(equityRequired) : "n/a"
+        }, Debt ratio: ${debtRatio || "n/a"}%, COD: ${codDate || "n/a"}`,
     ]
       .filter(Boolean)
       .join(" | ");
@@ -328,6 +346,9 @@ const Home: React.FC = () => {
       isApproved: false,
       totalStaked: 0,
       stakers: 0,
+      devCap: devCapRequired,
+      equity: equityRequired,
+      debtRatioValue: debtRatio,
     };
 
     setProjects((prev) => [...prev, newProject]);
@@ -386,6 +407,7 @@ const Home: React.FC = () => {
     () => projects.reduce((sum, p) => sum + p.totalStaked, 0),
     [projects]
   );
+  const connectedWallets = activeAddress ? 1 : 0;
 
   const firstApprovedProject = projects.find((p) => p.isApproved) ?? null;
 
@@ -396,7 +418,7 @@ const Home: React.FC = () => {
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div className="space-y-2">
               <h1 className="text-2xl md:text-3xl font-semibold text-emerald-300">
-                ⚡ Protius Protocol — Back-up for First Demo
+                ⚡ Protius Protocol — Algorand Demo
               </h1>
               <p className="text-sm md:text-base text-emerald-100/80 max-w-2xl">
                 Register a renewable energy project, approve it, simulate
@@ -453,7 +475,11 @@ const Home: React.FC = () => {
           <div className="mt-3 flex flex-wrap gap-3 text-xs md:text-sm text-emerald-200/90">
             <span>{registeredCount} projects registered</span>
             <span>• {approvedCount} approved</span>
-            <span>• {totalDemoStaked.toFixed(2)} demo USDC staked</span>
+            <span>• {formatStake(totalDemoStaked)} demo USDC staked</span>
+            <span>
+              • {connectedWallets} wallet
+              {connectedWallets === 1 ? "" : "s"} connected
+            </span>
           </div>
         </header>
 
@@ -833,6 +859,21 @@ const Home: React.FC = () => {
                           Developer: {p.userName}
                         </div>
                       )}
+                      {(p.devCap || p.equity || p.debtRatioValue) && (
+                        <div className="mt-0.5 text-[10px] text-emerald-200/80">
+                          <span className="inline-flex items-center rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5">
+                            Dev cap:{" "}
+                            {p.devCap
+                              ? formatLargeNumber(p.devCap)
+                              : "n/a"}{" "}
+                            • Equity:{" "}
+                            {p.equity
+                              ? formatLargeNumber(p.equity)
+                              : "n/a"}{" "}
+                            • Debt: {p.debtRatioValue || "n/a"}%
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <button
@@ -848,7 +889,7 @@ const Home: React.FC = () => {
                         {p.isApproved ? "Approved" : "Approve"}
                       </button>
                       <div className="text-[10px] text-emerald-200/80">
-                        Demo staked: {p.totalStaked.toFixed(2)} USDC —{" "}
+                        Demo staked: {formatStake(p.totalStaked)} USDC —{" "}
                         {p.stakers} stakers
                       </div>
                     </div>
@@ -917,7 +958,7 @@ const Home: React.FC = () => {
                   <div className="text-xs text-emerald-200/80">
                     Total demo staked:{" "}
                     <span className="font-semibold">
-                      {firstApprovedProject.totalStaked.toFixed(2)} USDC
+                      {formatStake(firstApprovedProject.totalStaked)} USDC
                     </span>{" "}
                     —{" "}
                     <span className="font-semibold">
