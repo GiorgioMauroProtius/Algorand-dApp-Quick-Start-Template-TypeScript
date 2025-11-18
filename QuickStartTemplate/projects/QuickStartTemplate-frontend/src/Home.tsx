@@ -215,27 +215,20 @@ const COUNTRIES = [
 const Home: React.FC = () => {
   const { activeAddress } = useWallet();
 
-  // --- Modal state used by ConnectWallet + AppCalls ---
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const openModal = () => setIsModalOpen(true);        // for ConnectWallet
-  const closeModal = () => setIsModalOpen(false);       // for ConnectWallet
-  const setModalState = (value: boolean) => {           // for AppCalls
-    setIsModalOpen(value);
-  };
+  const openModal = () => setIsModalOpen(true);
+  const closeModal = () => setIsModalOpen(false);
+  const setModalState = (v: boolean) => setIsModalOpen(v);
 
-  // Scroll refs for steps 1 / 2 / 3
   const registrationRef = useRef<HTMLDivElement | null>(null);
   const approvalRef = useRef<HTMLDivElement | null>(null);
   const investorRef = useRef<HTMLDivElement | null>(null);
 
-  const scrollTo = (ref: React.RefObject<HTMLDivElement>) => {
+  const scrollTo = (ref: React.RefObject<HTMLDivElement>) =>
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
 
-  // --- Project registration state ---
   const [projects, setProjects] = useState<Project[]>([]);
-
   const [developerWallet, setDeveloperWallet] = useState("");
   const [userName, setUserName] = useState("");
   const [projectName, setProjectName] = useState("");
@@ -246,7 +239,6 @@ const Home: React.FC = () => {
   const [notes, setNotes] = useState("");
   const [showChecklist, setShowChecklist] = useState(false);
 
-  // Extended developer checklist
   const [landStatus, setLandStatus] = useState("");
   const [landZoning, setLandZoning] = useState("");
   const [permitting, setPermitting] = useState("");
@@ -257,38 +249,30 @@ const Home: React.FC = () => {
   const [approvals, setApprovals] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [devCapRequired, setDevCapRequired] = useState("");
-  const [debtRatio, setDebtRatio] = useState("70"); // default 70% debt
+  const [debtRatio, setDebtRatio] = useState("70");
   const [equityRequired, setEquityRequired] = useState("");
   const [autoEquity, setAutoEquity] = useState(true);
   const [codDate, setCodDate] = useState("");
 
-  // Investor demo
   const [stakeAmountInput, setStakeAmountInput] = useState("");
 
-  // Auto-fill developer wallet when wallet connects
   useEffect(() => {
     if (activeAddress && !developerWallet) {
       setDeveloperWallet(activeAddress);
     }
   }, [activeAddress, developerWallet]);
 
-  // Auto-calculate equity when devCap + debt ratio change
   useEffect(() => {
     if (!autoEquity) return;
 
     const dev = parseFloat(devCapRequired.replace(",", "."));
     const debt = parseFloat(debtRatio.replace(",", "."));
-
     if (isNaN(dev) || isNaN(debt)) {
       setEquityRequired("");
       return;
     }
-
     const equityPct = 100 - debt;
-    if (equityPct <= 0) {
-      setEquityRequired("");
-      return;
-    }
+    if (equityPct <= 0) return;
 
     const equity = (dev * equityPct) / 100;
     setEquityRequired(equity.toFixed(2));
@@ -348,7 +332,6 @@ const Home: React.FC = () => {
 
     setProjects((prev) => [...prev, newProject]);
 
-    // Reset main fields (we keep currency + debt ratio as they are often reused)
     setProjectName("");
     setCountry("");
     setCapacityValue("");
@@ -366,13 +349,12 @@ const Home: React.FC = () => {
     setEquityRequired("");
     setCodDate("");
 
-    // Scroll to approval section
     scrollTo(approvalRef);
   };
 
   const handleApproveProject = (id: number) => {
     setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, isApproved: true } : p)),
+      prev.map((p) => (p.id === id ? { ...p, isApproved: true } : p))
     );
   };
 
@@ -391,8 +373,8 @@ const Home: React.FC = () => {
               totalStaked: p.totalStaked + amount,
               stakers: p.stakers + 1,
             }
-          : p,
-      ),
+          : p
+      )
     );
 
     setStakeAmountInput("");
@@ -402,7 +384,7 @@ const Home: React.FC = () => {
   const approvedCount = projects.filter((p) => p.isApproved).length;
   const totalDemoStaked = useMemo(
     () => projects.reduce((sum, p) => sum + p.totalStaked, 0),
-    [projects],
+    [projects]
   );
 
   const firstApprovedProject = projects.find((p) => p.isApproved) ?? null;
@@ -410,7 +392,6 @@ const Home: React.FC = () => {
   return (
     <div className="min-h-screen bg-black/70 text-slate-100">
       <div className="max-w-6xl mx-auto px-4 py-8 md:py-12 space-y-8">
-        {/* Header + wallet + metrics */}
         <header className="space-y-4 border-b border-emerald-500/40 pb-4 bg-black/60 backdrop-blur-sm rounded-xl p-4 md:p-6 shadow-lg">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div className="space-y-2">
@@ -432,12 +413,10 @@ const Home: React.FC = () => {
             </div>
 
             <div className="self-start">
-              {/* Top-right connect / disconnect button */}
               <ConnectWallet openModal={openModal} closeModal={closeModal} />
             </div>
           </div>
 
-          {/* Step pills */}
           <div className="mt-4 flex flex-wrap gap-3 text-xs md:text-sm">
             <button
               type="button"
@@ -478,7 +457,6 @@ const Home: React.FC = () => {
           </div>
         </header>
 
-        {/* === Step 1: Registration === */}
         <section
           ref={registrationRef}
           className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg overflow-hidden"
@@ -790,7 +768,6 @@ const Home: React.FC = () => {
           </form>
         </section>
 
-        {/* === Step 2: Approve & view projects === */}
         <section
           ref={approvalRef}
           className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3"
@@ -871,12 +848,7 @@ const Home: React.FC = () => {
           )}
         </section>
 
-        {/* === Step 3: Investor + HelloWorld grid === */}
-        <div
-          ref={investorRef}
-          className="grid md:grid-cols-[1.4fr,1.2fr] gap-6"
-        >
-          {/* Investor / staking demo */}
+        <div ref={investorRef} className="grid md:grid-cols-[1.4fr,1.2fr] gap-6">
           <section className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm text-black font-semibold">
@@ -947,7 +919,6 @@ const Home: React.FC = () => {
             </div>
           </section>
 
-          {/* HelloWorld / on-chain demo */}
           <section className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm text-black font-semibold">
@@ -965,13 +936,11 @@ const Home: React.FC = () => {
             </p>
 
             <div className="mt-2">
-              {/* Here AppCalls expects: openModal: boolean; setModalState: (value: boolean) => void */}
-              <AppCalls openModal={isModalOpen} setModalState={setModalState} />
+              <AppCalls openModal={openModal} setModalState={setModalState} />
             </div>
           </section>
         </div>
 
-        {/* Footer */}
         <footer className="pt-4 text-center">
           <p className="text-white/85 text-xs inline-block bg-black/40 px-3 py-1 rounded-full drop-shadow-md">
             Protius Protocol — Built on Algorand TestNet.
