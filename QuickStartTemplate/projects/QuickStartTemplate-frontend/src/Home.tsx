@@ -219,7 +219,6 @@ const Home: React.FC = () => {
   const { activeAddress } = useWallet();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
   const setModalState = (v: boolean) => setIsModalOpen(v);
@@ -259,6 +258,8 @@ const Home: React.FC = () => {
 
   const [stakeAmountInput, setStakeAmountInput] = useState("");
 
+  // helpers -----------------------------------------------------
+
   const formatLargeNumber = (value: string) => {
     if (!value) return "";
     const cleaned = value.replace(/,/g, "").replace(/\s/g, "");
@@ -286,6 +287,8 @@ const Home: React.FC = () => {
     return decPart !== undefined ? `${formattedInt}.${decPart}` : formattedInt;
   };
 
+  // effects -----------------------------------------------------
+
   useEffect(() => {
     if (activeAddress && !developerWallet) {
       setDeveloperWallet(activeAddress);
@@ -309,6 +312,8 @@ const Home: React.FC = () => {
     const equity = (dev * equityPct) / 100;
     setEquityRequired(equity.toFixed(2));
   }, [devCapRequired, debtRatio, autoEquity]);
+
+  // handlers ----------------------------------------------------
 
   const handleSubmitProject = (e: React.FormEvent) => {
     e.preventDefault();
@@ -367,6 +372,7 @@ const Home: React.FC = () => {
 
     setProjects((prev) => [...prev, newProject]);
 
+    // reset some fields
     setProjectName("");
     setCountry("");
     setCapacityValue("");
@@ -417,6 +423,8 @@ const Home: React.FC = () => {
     setStakeAmountInput("");
   };
 
+  // derived values ----------------------------------------------
+
   const registeredCount = projects.length;
   const approvedCount = projects.filter((p) => p.isApproved).length;
   const totalDemoStaked = useMemo(
@@ -426,6 +434,8 @@ const Home: React.FC = () => {
   const connectedWallets = activeAddress ? 1 : 0;
 
   const firstApprovedProject = projects.find((p) => p.isApproved) ?? null;
+
+  // render ------------------------------------------------------
 
   return (
     <div className="min-h-screen bg-black/70 text-slate-100">
@@ -499,6 +509,7 @@ const Home: React.FC = () => {
           </div>
         </header>
 
+        {/* Registration --------------------------------------------------- */}
         <section
           ref={registrationRef}
           className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg overflow-hidden"
@@ -832,6 +843,7 @@ const Home: React.FC = () => {
           </form>
         </section>
 
+        {/* Approval ------------------------------------------------------- */}
         <section
           ref={approvalRef}
           className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3"
@@ -927,6 +939,7 @@ const Home: React.FC = () => {
           )}
         </section>
 
+        {/* Investor + HelloWorld ----------------------------------------- */}
         <div ref={investorRef} className="grid md:grid-cols-[1.4fr,1.2fr] gap-6">
           <section className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
@@ -1007,42 +1020,43 @@ const Home: React.FC = () => {
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm text-black font-semibold">
                 4
               </span>
-            <h2 className="font-semibold text-emerald-100">
-              HelloWorld on Algorand (demo wire-up)
-            </h2>
-          </div>
-          <p className="text-xs text-emerald-100/80">
-            This panel talks to the live{" "}
-            <span className="font-semibold">HelloWorld</span> smart contract
-            already deployed on Algorand TestNet. For now it returns a simple
-            response; next we replace this with the Protius staking contract.
+              <h2 className="font-semibold text-emerald-100">
+                HelloWorld on Algorand (demo wire-up)
+              </h2>
+            </div>
+            <p className="text-xs text-emerald-100/80">
+              This panel talks to the live{" "}
+              <span className="font-semibold">HelloWorld</span> smart contract
+              already deployed on Algorand TestNet. For now it returns a simple
+              response; next we replace this with the Protius staking contract.
+            </p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setModalState(true)}
+                className="rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold px-4 py-2 shadow-lg shadow-emerald-500/30"
+              >
+                Open HelloWorld demo
+              </button>
+              <span className="text-[11px] text-emerald-200/80">
+                Opens a dialog that deploys and calls the TestNet HelloWorld
+                contract.
+              </span>
+            </div>
+
+            <div className="mt-2">
+              <AppCalls openModal={isModalOpen} setModalState={setModalState} />
+            </div>
+          </section>
+        </div>
+
+        <footer className="pt-4 text-center">
+          <p className="text-white/85 text-xs inline-block bg-black/40 px-3 py-1 rounded-full drop-shadow-md">
+            Protius Protocol — Built on Algorand TestNet.
           </p>
-
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setModalState(true)}
-              className="rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold px-4 py-2 shadow-lg shadow-emerald-500/30"
-            >
-              Open HelloWorld demo
-            </button>
-            <span className="text-[11px] text-emerald-200/80">
-              Opens a dialog that deploys and calls the TestNet HelloWorld
-              contract.
-            </span>
-          </div>
-
-          <div className="mt-2">
-            <AppCalls openModal={isModalOpen} setModalState={setModalState} />
-          </div>
-        </section>
+        </footer>
       </div>
-
-      <footer className="pt-4 text-center">
-        <p className="text-white/85 text-xs inline-block bg-black/40 px-3 py-1 rounded-full drop-shadow-md">
-          Protius Protocol — Built on Algorand TestNet.
-        </p>
-      </footer>
     </div>
   );
 };
