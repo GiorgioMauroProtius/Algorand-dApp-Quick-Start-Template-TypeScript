@@ -274,6 +274,18 @@ const Home: React.FC = () => {
     });
   };
 
+  const formatInputWithCommas = (value: string) => {
+    if (!value) return "";
+    const cleaned = value.replace(/,/g, "").replace(/\s/g, "");
+    const [intPart, decPart] = cleaned.split(".");
+    const intNum = Number(intPart);
+    if (isNaN(intNum)) return value;
+    const formattedInt = intNum.toLocaleString("en-US", {
+      maximumFractionDigits: 0,
+    });
+    return decPart !== undefined ? `${formattedInt}.${decPart}` : formattedInt;
+  };
+
   useEffect(() => {
     if (activeAddress && !developerWallet) {
       setDeveloperWallet(activeAddress);
@@ -283,7 +295,9 @@ const Home: React.FC = () => {
   useEffect(() => {
     if (!autoEquity) return;
 
-    const dev = parseFloat(devCapRequired.replace(",", "."));
+    const dev = parseFloat(
+      devCapRequired.replace(/,/g, "").replace(/\s/g, "")
+    );
     const debt = parseFloat(debtRatio.replace(",", "."));
     if (isNaN(dev) || isNaN(debt)) {
       setEquityRequired("");
@@ -380,7 +394,9 @@ const Home: React.FC = () => {
   };
 
   const handleStakeDemo = (id: number) => {
-    const amount = parseFloat(stakeAmountInput.replace(",", ".") || "0");
+    const amount = parseFloat(
+      stakeAmountInput.replace(/,/g, "").replace(/\s/g, "") || "0"
+    );
     if (!amount || amount <= 0) {
       alert("Enter a positive amount to stake.");
       return;
@@ -418,7 +434,7 @@ const Home: React.FC = () => {
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div className="space-y-2">
               <h1 className="text-2xl md:text-3xl font-semibold text-emerald-300">
-                ⚡ Protius Protocol — Algorand Demo
+                ⚡ Protius Protocol — First Demo
               </h1>
               <p className="text-sm md:text-base text-emerald-100/80 max-w-2xl">
                 Register a renewable energy project, approve it, simulate
@@ -755,7 +771,11 @@ const Home: React.FC = () => {
                   <input
                     className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                     value={devCapRequired}
-                    onChange={(e) => setDevCapRequired(e.target.value)}
+                    onChange={(e) =>
+                      setDevCapRequired(
+                        formatInputWithCommas(e.target.value)
+                      )
+                    }
                   />
                 </div>
 
@@ -778,7 +798,9 @@ const Home: React.FC = () => {
                     className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50 disabled:opacity-70"
                     value={equityRequired}
                     onChange={(e) => {
-                      setEquityRequired(e.target.value);
+                      setEquityRequired(
+                        formatInputWithCommas(e.target.value)
+                      );
                       setAutoEquity(false);
                     }}
                     disabled={autoEquity}
@@ -931,7 +953,11 @@ const Home: React.FC = () => {
                   className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-3 py-2 text-sm text-emerald-50 placeholder:text-emerald-200/40"
                   placeholder="e.g., 1.00"
                   value={stakeAmountInput}
-                  onChange={(e) => setStakeAmountInput(e.target.value)}
+                  onChange={(e) =>
+                    setStakeAmountInput(
+                      formatInputWithCommas(e.target.value)
+                    )
+                  }
                 />
               </div>
 
@@ -981,46 +1007,42 @@ const Home: React.FC = () => {
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm text-black font-semibold">
                 4
               </span>
-              <h2 className="font-semibold text-emerald-100">
-                HelloWorld on Algorand (demo wire-up)
-              </h2>
-            </div>
-            <p className="text-xs text-emerald-100/80">
-              This panel talks to the live{" "}
-              <span className="font-semibold">HelloWorld</span> smart contract
-              already deployed on Algorand TestNet. For now it returns a simple
-              response; next we replace this with the Protius staking contract.
-            </p>
-
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setModalState(true)}
-                className="rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold px-4 py-2 shadow-lg shadow-emerald-500/30"
-              >
-                Open HelloWorld demo
-              </button>
-              <span className="text-[11px] text-emerald-200/80">
-                Opens a dialog that deploys and calls the TestNet HelloWorld
-                contract.
-              </span>
-            </div>
-
-            <div className="mt-2">
-              <AppCalls
-                openModal={isModalOpen}
-                setModalState={setModalState}
-              />
-            </div>
-          </section>
-        </div>
-
-        <footer className="pt-4 text-center">
-          <p className="text-white/85 text-xs inline-block bg-black/40 px-3 py-1 rounded-full drop-shadow-md">
-            Protius Protocol — Built on Algorand TestNet.
+            <h2 className="font-semibold text-emerald-100">
+              HelloWorld on Algorand (demo wire-up)
+            </h2>
+          </div>
+          <p className="text-xs text-emerald-100/80">
+            This panel talks to the live{" "}
+            <span className="font-semibold">HelloWorld</span> smart contract
+            already deployed on Algorand TestNet. For now it returns a simple
+            response; next we replace this with the Protius staking contract.
           </p>
-        </footer>
+
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setModalState(true)}
+              className="rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold px-4 py-2 shadow-lg shadow-emerald-500/30"
+            >
+              Open HelloWorld demo
+            </button>
+            <span className="text-[11px] text-emerald-200/80">
+              Opens a dialog that deploys and calls the TestNet HelloWorld
+              contract.
+            </span>
+          </div>
+
+          <div className="mt-2">
+            <AppCalls openModal={isModalOpen} setModalState={setModalState} />
+          </div>
+        </section>
       </div>
+
+      <footer className="pt-4 text-center">
+        <p className="text-white/85 text-xs inline-block bg-black/40 px-3 py-1 rounded-full drop-shadow-md">
+          Protius Protocol — Built on Algorand TestNet.
+        </p>
+      </footer>
     </div>
   );
 };
