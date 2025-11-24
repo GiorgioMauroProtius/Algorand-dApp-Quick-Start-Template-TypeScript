@@ -215,6 +215,8 @@ const COUNTRIES = [
   "Zimbabwe",
 ];
 
+const STORAGE_KEY = "protius-demo-projects-v1";
+
 const Home: React.FC = () => {
   const { activeAddress } = useWallet();
 
@@ -258,6 +260,9 @@ const Home: React.FC = () => {
 
   const [stakeAmountInput, setStakeAmountInput] = useState("");
 
+  // project detail modal
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
   // helpers -----------------------------------------------------
 
   const formatLargeNumber = (value: string) => {
@@ -287,38 +292,74 @@ const Home: React.FC = () => {
     return decPart !== undefined ? `${formattedInt}.${decPart}` : formattedInt;
   };
 
+  const parseNumericString = (value: string) => {
+    if (!value) return 0;
+    const cleaned = value.replace(/,/g, "").replace(/\s/g, "");
+    const num = Number(cleaned.replace(",", "."));
+    return isNaN(num) ? 0 : num;
+  };
+
   // effects -----------------------------------------------------
 
+  // auto-fill developer wallet
   useEffect(() => {
     if (activeAddress && !developerWallet) {
       setDeveloperWallet(activeAddress);
     }
   }, [activeAddress, developerWallet]);
 
+  // calculate equity from dev cap + debt ratio
   useEffect(() => {
     if (!autoEquity) return;
 
-    const dev = parseFloat(
-      devCapRequired.replace(/,/g, "").replace(/\s/g, "")
-    );
-    const debt = parseFloat(debtRatio.replace(",", "."));
-    if (isNaN(dev) || isNaN(debt)) {
+    const dev = parseNumericString(devCapRequired);
+    const debt = parseNumericString(debtRatio);
+    if (!dev || !debt) {
       setEquityRequired("");
       return;
     }
     const equityPct = 100 - debt;
-    if (equityPct <= 0) return;
+    if (equityPct <= 0) {
+      setEquityRequired("");
+      return;
+    }
 
     const equity = (dev * equityPct) / 100;
-    setEquityRequired(equity.toFixed(2));
+    setEquityRequired(formatLargeNumber(equity.toString()));
   }, [devCapRequired, debtRatio, autoEquity]);
+
+  // load projects from localStorage on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as Project[];
+        if (Array.isArray(parsed)) {
+          setProjects(parsed);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load projects from storage", err);
+    }
+  }, []);
+
+  // persist projects to localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+    } catch (err) {
+      console.error("Failed to save projects to storage", err);
+    }
+  }, [projects]);
 
   // handlers ----------------------------------------------------
 
   const handleSubmitProject = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!activeAddress) {
+    if (!activeAddress && !developerWallet) {
       alert("Connect your wallet first.");
       return;
     }
@@ -332,6 +373,8 @@ const Home: React.FC = () => {
     const capacityDisplay = capacityValue
       ? `${capacityValue} ${capacityUnit}`
       : "n/a";
+
+    const distanceDisplay = distanceKm ? distanceKm : "n/a";
 
     const notesCombined = [
       notes,
@@ -355,12 +398,12 @@ const Home: React.FC = () => {
 
     const newProject: Project = {
       id,
-      developerWallet: developerWallet || activeAddress,
+      developerWallet: developerWallet || activeAddress || "",
       userName,
       name: projectName,
       country,
       capacity: capacityDisplay,
-      distanceKm,
+      distanceKm: distanceDisplay,
       notes: notesCombined,
       isApproved: false,
       totalStaked: 0,
@@ -400,9 +443,7 @@ const Home: React.FC = () => {
   };
 
   const handleStakeDemo = (id: number) => {
-    const amount = parseFloat(
-      stakeAmountInput.replace(/,/g, "").replace(/\s/g, "") || "0"
-    );
+    const amount = parseNumericString(stakeAmountInput);
     if (!amount || amount <= 0) {
       alert("Enter a positive amount to stake.");
       return;
@@ -421,6 +462,14 @@ const Home: React.FC = () => {
     );
 
     setStakeAmountInput("");
+  };
+
+  const handleOpenProjectDetails = (project: Project) => {
+    setSelectedProject(project);
+  };
+
+  const handleCloseProjectDetails = () => {
+    setSelectedProject(null);
   };
 
   // derived values ----------------------------------------------
@@ -573,7 +622,9 @@ const Home: React.FC = () => {
                     className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-3 py-2 text-sm text-emerald-50 placeholder:text-emerald-200/40"
                     placeholder="e.g., 5 000"
                     value={capacityValue}
-                    onChange={(e) => setCapacityValue(e.target.value)}
+                    onChange={(e) =>
+                      setCapacityValue(formatInputWithCommas(e.target.value))
+                    }
                   />
                 </div>
                 <div>
@@ -619,7 +670,9 @@ const Home: React.FC = () => {
                   className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-3 py-2 text-sm text-emerald-50 placeholder:text-emerald-200/40"
                   placeholder="e.g., 12.5"
                   value={distanceKm}
-                  onChange={(e) => setDistanceKm(e.target.value)}
+                  onChange={(e) =>
+                    setDistanceKm(formatInputWithCommas(e.target.value))
+                  }
                 />
               </div>
             </div>
@@ -783,9 +836,7 @@ const Home: React.FC = () => {
                     className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                     value={devCapRequired}
                     onChange={(e) =>
-                      setDevCapRequired(
-                        formatInputWithCommas(e.target.value)
-                      )
+                      setDevCapRequired(formatInputWithCommas(e.target.value))
                     }
                   />
                 </div>
@@ -901,10 +952,8 @@ const Home: React.FC = () => {
                               ? formatLargeNumber(p.devCap)
                               : "n/a"}{" "}
                             • Equity:{" "}
-                            {p.equity
-                              ? formatLargeNumber(p.equity)
-                              : "n/a"}{" "}
-                            • Debt: {p.debtRatioValue || "n/a"}%
+                            {p.equity ? formatLargeNumber(p.equity) : "n/a"} •
+                            Debt: {p.debtRatioValue || "n/a"}%
                           </span>
                         </div>
                       )}
@@ -921,6 +970,13 @@ const Home: React.FC = () => {
                         }`}
                       >
                         {p.isApproved ? "Approved" : "Approve"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenProjectDetails(p)}
+                        className="text-[10px] underline text-emerald-300 hover:text-emerald-100"
+                      >
+                        View details
                       </button>
                       <div className="text-[10px] text-emerald-200/80">
                         Demo staked: {formatStake(p.totalStaked)} USDC —{" "}
@@ -996,9 +1052,9 @@ const Home: React.FC = () => {
                   </div>
                   <div className="text-xs text-emerald-200/80">
                     Total demo staked:{" "}
-                    <span className="font-semibold">
-                      {formatStake(firstApprovedProject.totalStaked)} USDC
-                    </span>{" "}
+                      <span className="font-semibold">
+                        {formatStake(firstApprovedProject.totalStaked)} USDC
+                      </span>{" "}
                     —{" "}
                     <span className="font-semibold">
                       {firstApprovedProject.stakers}
@@ -1057,6 +1113,91 @@ const Home: React.FC = () => {
           </p>
         </footer>
       </div>
+
+      {/* Project detail modal */}
+      {selectedProject && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="max-w-lg w-full rounded-xl bg-slate-950 border border-emerald-500/40 shadow-2xl p-4 space-y-3 text-xs text-emerald-50">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-emerald-200">
+                  {selectedProject.name}
+                </h3>
+                <p className="text-[11px] text-emerald-200/80">
+                  {selectedProject.capacity} — {selectedProject.country} —{" "}
+                  {selectedProject.distanceKm || "n/a"} km to substation
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseProjectDetails}
+                className="text-[11px] text-emerald-300 hover:text-emerald-100"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-[10px] text-emerald-300/90">
+                  Developer wallet
+                </div>
+                <div className="font-mono break-all">
+                  {selectedProject.developerWallet || "n/a"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] text-emerald-300/90">
+                  Developer name
+                </div>
+                <div>{selectedProject.userName || "n/a"}</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-emerald-300/90">
+                  Demo staked
+                </div>
+                <div>
+                  {formatStake(selectedProject.totalStaked)} USDC —{" "}
+                  {selectedProject.stakers} stakers
+                </div>
+              </div>
+              {(selectedProject.devCap ||
+                selectedProject.equity ||
+                selectedProject.debtRatioValue) && (
+                <div>
+                  <div className="text-[10px] text-emerald-300/90">
+                    Financial snapshot
+                  </div>
+                  <div>
+                    Dev cap:{" "}
+                    {selectedProject.devCap
+                      ? formatLargeNumber(selectedProject.devCap)
+                      : "n/a"}
+                    , Equity:{" "}
+                    {selectedProject.equity
+                      ? formatLargeNumber(selectedProject.equity)
+                      : "n/a"}
+                    , Debt: {selectedProject.debtRatioValue || "n/a"}%
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {selectedProject.notes && (
+              <div className="pt-2 border-t border-emerald-500/30">
+                <div className="text-[10px] text-emerald-300/90 mb-1">
+                  Project notes & milestones
+                </div>
+                <ul className="list-disc list-inside space-y-0.5 text-[11px] text-emerald-100/90">
+                  {selectedProject.notes.split(" | ").map((chunk, idx) => (
+                    <li key={idx}>{chunk}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
