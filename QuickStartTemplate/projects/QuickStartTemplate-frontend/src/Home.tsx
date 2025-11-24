@@ -258,7 +258,11 @@ const Home: React.FC = () => {
   const [autoEquity, setAutoEquity] = useState(true);
   const [codDate, setCodDate] = useState("");
 
-  const [stakeAmountInput, setStakeAmountInput] = useState("");
+  // staking inputs per project id
+  const [stakeInputs, setStakeInputs] = useState<Record<number, string>>({});
+
+  // which project is being edited (in the registration form)
+  const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
 
   // project detail modal
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -368,8 +372,6 @@ const Home: React.FC = () => {
       return;
     }
 
-    const id = projects.length + 1;
-
     const capacityDisplay = capacityValue
       ? `${capacityValue} ${capacityUnit}`
       : "n/a";
@@ -396,26 +398,52 @@ const Home: React.FC = () => {
       .filter(Boolean)
       .join(" | ");
 
-    const newProject: Project = {
-      id,
-      developerWallet: developerWallet || activeAddress || "",
-      userName,
-      name: projectName,
-      country,
-      capacity: capacityDisplay,
-      distanceKm: distanceDisplay,
-      notes: notesCombined,
-      isApproved: false,
-      totalStaked: 0,
-      stakers: 0,
-      devCap: devCapRequired,
-      equity: equityRequired,
-      debtRatioValue: debtRatio,
-    };
+    if (editingProjectId !== null) {
+      // update existing project
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id === editingProjectId
+            ? {
+                ...p,
+                developerWallet: developerWallet || activeAddress || "",
+                userName,
+                name: projectName,
+                country,
+                capacity: capacityDisplay,
+                distanceKm: distanceDisplay,
+                notes: notesCombined,
+                devCap: devCapRequired,
+                equity: equityRequired,
+                debtRatioValue: debtRatio,
+              }
+            : p
+        )
+      );
+    } else {
+      // create new project
+      const id = projects.length + 1;
 
-    setProjects((prev) => [...prev, newProject]);
+      const newProject: Project = {
+        id,
+        developerWallet: developerWallet || activeAddress || "",
+        userName,
+        name: projectName,
+        country,
+        capacity: capacityDisplay,
+        distanceKm: distanceDisplay,
+        notes: notesCombined,
+        isApproved: false,
+        totalStaked: 0,
+        stakers: 0,
+        devCap: devCapRequired,
+        equity: equityRequired,
+        debtRatioValue: debtRatio,
+      };
 
-    // reset some fields
+      setProjects((prev) => [...prev, newProject]);
+    }
+
+    // reset form fields (keep wallet + currency/debt settings)
     setProjectName("");
     setCountry("");
     setCapacityValue("");
@@ -432,6 +460,8 @@ const Home: React.FC = () => {
     setDevCapRequired("");
     setEquityRequired("");
     setCodDate("");
+    setShowChecklist(false);
+    setEditingProjectId(null);
 
     scrollTo(approvalRef);
   };
@@ -443,7 +473,8 @@ const Home: React.FC = () => {
   };
 
   const handleStakeDemo = (id: number) => {
-    const amount = parseNumericString(stakeAmountInput);
+    const raw = stakeInputs[id] ?? "";
+    const amount = parseNumericString(raw);
     if (!amount || amount <= 0) {
       alert("Enter a positive amount to stake.");
       return;
@@ -461,7 +492,82 @@ const Home: React.FC = () => {
       )
     );
 
-    setStakeAmountInput("");
+    // clear local stake input for this project
+    setStakeInputs((prev) => {
+      const { [id]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const startEditProject = (project: Project) => {
+    setEditingProjectId(project.id);
+    setDeveloperWallet(project.developerWallet || activeAddress || "");
+    setUserName(project.userName || "");
+    setProjectName(project.name || "");
+    setCountry(project.country || "");
+
+    if (project.capacity && project.capacity !== "n/a") {
+      const parts = project.capacity.split(" ");
+      const unitPart = parts[parts.length - 1] as "kW" | "MW";
+      const valuePart = parts.slice(0, parts.length - 1).join(" ");
+      setCapacityUnit(unitPart === "MW" ? "MW" : "kW");
+      setCapacityValue(valuePart);
+    } else {
+      setCapacityUnit("kW");
+      setCapacityValue("");
+    }
+
+    setDistanceKm(project.distanceKm || "");
+    setDevCapRequired(project.devCap || "");
+    setEquityRequired(project.equity || "");
+    setDebtRatio(project.debtRatioValue || "70");
+    setNotes(project.notes || "");
+    setShowChecklist(true);
+
+    scrollTo(registrationRef);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProjectId(null);
+    setProjectName("");
+    setCountry("");
+    setCapacityValue("");
+    setDistanceKm("");
+    setNotes("");
+    setLandStatus("");
+    setLandZoning("");
+    setPermitting("");
+    setInsurances("");
+    setContracts("");
+    setStudiesCompleted("");
+    setStudiesOutstanding("");
+    setApprovals("");
+    setDevCapRequired("");
+    setEquityRequired("");
+    setCodDate("");
+    setShowChecklist(false);
+  };
+
+  const handleDeleteProject = (id: number) => {
+    const confirmed = window.confirm(
+      "Delete this project from the demo? This will also remove its demo staking history."
+    );
+    if (!confirmed) return;
+
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+
+    setStakeInputs((prev) => {
+      const { [id]: _, ...rest } = prev;
+      return rest;
+    });
+
+    if (editingProjectId === id) {
+      handleCancelEdit();
+    }
+
+    if (selectedProject?.id === id) {
+      setSelectedProject(null);
+    }
   };
 
   const handleOpenProjectDetails = (project: Project) => {
@@ -475,14 +581,13 @@ const Home: React.FC = () => {
   // derived values ----------------------------------------------
 
   const registeredCount = projects.length;
-  const approvedCount = projects.filter((p) => p.isApproved).length;
+  const approvedProjects = projects.filter((p) => p.isApproved);
+  const approvedCount = approvedProjects.length;
   const totalDemoStaked = useMemo(
     () => projects.reduce((sum, p) => sum + p.totalStaked, 0),
     [projects]
   );
   const connectedWallets = activeAddress ? 1 : 0;
-
-  const firstApprovedProject = projects.find((p) => p.isApproved) ?? null;
 
   // render ------------------------------------------------------
 
@@ -497,9 +602,9 @@ const Home: React.FC = () => {
               </h1>
               <p className="text-sm md:text-base text-emerald-100/80 max-w-2xl">
                 Register a renewable energy project, approve it, simulate
-                community staking, and ping a live Algorand smart contract —
-                all in one simple flow. Background is subtle so the data and
-                staking logic stay front and centre.
+                community staking, and ping a live Algorand smart contract — all
+                in one simple flow. Background is subtle so the data and staking
+                logic stay front and centre.
               </p>
               {activeAddress && (
                 <p className="text-xs md:text-sm text-emerald-200/90 break-all">
@@ -573,6 +678,22 @@ const Home: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmitProject} className="p-4 space-y-4">
+            {editingProjectId !== null && (
+              <div className="mb-2 flex items-center justify-between rounded-md border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-100">
+                <span>
+                  Editing existing project — changes will update the card in
+                  step 2.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="ml-3 text-[11px] underline text-emerald-300 hover:text-emerald-100"
+                >
+                  Cancel edit
+                </button>
+              </div>
+            )}
+
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium mb-1 text-emerald-100">
@@ -888,7 +1009,7 @@ const Home: React.FC = () => {
                 type="submit"
                 className="w-full md:w-auto rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-6 py-2 text-sm shadow-lg shadow-emerald-500/30"
               >
-                Submit project
+                {editingProjectId !== null ? "Update project" : "Submit project"}
               </button>
             </div>
           </form>
@@ -909,8 +1030,8 @@ const Home: React.FC = () => {
           </div>
           <p className="text-xs text-emerald-100/80">
             In a full Protius flow, this step sits with InfraPilot AI and the
-            investment committee. For this demo, you can approve a project with
-            a single click and make it available for the staking panel.
+            investment committee. For this demo, you can approve, edit, or
+            delete a project and make it available for the staking panel.
           </p>
 
           {projects.length === 0 ? (
@@ -959,18 +1080,34 @@ const Home: React.FC = () => {
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <button
-                        type="button"
-                        disabled={p.isApproved}
-                        onClick={() => handleApproveProject(p.id)}
-                        className={`rounded-md px-3 py-1 text-[11px] font-semibold ${
-                          p.isApproved
-                            ? "bg-emerald-500/20 text-emerald-200 cursor-default"
-                            : "bg-emerald-500 hover:bg-emerald-400 text-slate-950"
-                        }`}
-                      >
-                        {p.isApproved ? "Approved" : "Approve"}
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={p.isApproved}
+                          onClick={() => handleApproveProject(p.id)}
+                          className={`rounded-md px-3 py-1 text-[11px] font-semibold ${
+                            p.isApproved
+                              ? "bg-emerald-500/20 text-emerald-200 cursor-default"
+                              : "bg-emerald-500 hover:bg-emerald-400 text-slate-950"
+                          }`}
+                        >
+                          {p.isApproved ? "Approved" : "Approve"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => startEditProject(p)}
+                          className="rounded-md px-2 py-1 text-[10px] border border-emerald-400/70 text-emerald-200 hover:bg-emerald-500/10"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteProject(p.id)}
+                          className="rounded-md px-2 py-1 text-[10px] border border-red-500/70 text-red-300 hover:bg-red-500/10"
+                        >
+                          Delete
+                        </button>
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleOpenProjectDetails(p)}
@@ -996,7 +1133,10 @@ const Home: React.FC = () => {
         </section>
 
         {/* Investor + HelloWorld ----------------------------------------- */}
-        <div ref={investorRef} className="grid md:grid-cols-[1.4fr,1.2fr] gap-6">
+        <div
+          ref={investorRef}
+          className="grid md:grid-cols-[1.4fr,1.2fr] gap-6"
+        >
           <section className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm text-black font-semibold">
@@ -1007,68 +1147,77 @@ const Home: React.FC = () => {
               </h2>
             </div>
             <p className="text-xs text-emerald-100/80">
-              Imagine you are a community investor. Pick the first approved
-              project below and simulate staking demo USDC into it. This is
-              front-end only for now — in the next step, the Protius staking
-              smart contract will plug in.
+              Imagine you are a community investor. Each approved project below
+              has its own demo staking panel. This is front-end only for now —
+              in the next step, the Protius staking smart contract will plug in.
             </p>
 
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium mb-1 text-emerald-100">
-                  Stake amount (demo USDC)
-                </label>
-                <input
-                  className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-3 py-2 text-sm text-emerald-50 placeholder:text-emerald-200/40"
-                  placeholder="e.g., 1.00"
-                  value={stakeAmountInput}
-                  onChange={(e) =>
-                    setStakeAmountInput(
-                      formatInputWithCommas(e.target.value)
-                    )
-                  }
-                />
-              </div>
-
-              {firstApprovedProject ? (
-                <div className="rounded-lg border border-emerald-500/40 bg-slate-900/70 px-3 py-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-semibold text-emerald-100">
-                        {firstApprovedProject.name}
+            {approvedProjects.length > 0 ? (
+              <div className="space-y-3">
+                {approvedProjects.map((p) => {
+                  const stakeValue = stakeInputs[p.id] ?? "";
+                  return (
+                    <div
+                      key={p.id}
+                      className="rounded-lg border border-emerald-500/40 bg-slate-900/70 px-3 py-3 space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-semibold text-emerald-100">
+                            {p.name}
+                          </div>
+                          <div className="text-xs text-emerald-200/80">
+                            {p.capacity} — {p.country || "Country"}
+                          </div>
+                        </div>
                       </div>
+
+                      <div className="grid grid-cols-[1.4fr,auto] gap-3 items-end">
+                        <div>
+                          <label className="block text-[11px] font-medium mb-1 text-emerald-100">
+                            Stake amount (demo USDC)
+                          </label>
+                          <input
+                            className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-3 py-1.5 text-sm text-emerald-50 placeholder:text-emerald-200/40"
+                            placeholder="e.g., 1.00"
+                            value={stakeValue}
+                            onChange={(e) =>
+                              setStakeInputs((prev) => ({
+                                ...prev,
+                                [p.id]: formatInputWithCommas(e.target.value),
+                              }))
+                            }
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold px-4 py-1.5"
+                          onClick={() => handleStakeDemo(p.id)}
+                          disabled={!stakeValue.trim()}
+                        >
+                          Stake (demo only)
+                        </button>
+                      </div>
+
                       <div className="text-xs text-emerald-200/80">
-                        {firstApprovedProject.capacity} —{" "}
-                        {firstApprovedProject.country || "Country"}
+                        Total demo staked:{" "}
+                        <span className="font-semibold">
+                          {formatStake(p.totalStaked)} USDC
+                        </span>{" "}
+                        —{" "}
+                        <span className="font-semibold">{p.stakers}</span>{" "}
+                        stakers
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      className="rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold px-4 py-1.5"
-                      onClick={() => handleStakeDemo(firstApprovedProject.id)}
-                    >
-                      Stake (demo only)
-                    </button>
-                  </div>
-                  <div className="text-xs text-emerald-200/80">
-                    Total demo staked:{" "}
-                      <span className="font-semibold">
-                        {formatStake(firstApprovedProject.totalStaked)} USDC
-                      </span>{" "}
-                    —{" "}
-                    <span className="font-semibold">
-                      {firstApprovedProject.stakers}
-                    </span>{" "}
-                    stakers
-                  </div>
-                </div>
-              ) : (
-                <p className="text-xs text-emerald-200/70">
-                  Approve at least one project in step 2 to enable the staking
-                  demo.
-                </p>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-emerald-200/70">
+                Approve at least one project in step 2 to enable the staking
+                demo.
+              </p>
+            )}
           </section>
 
           <section className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3">
@@ -1095,10 +1244,6 @@ const Home: React.FC = () => {
               >
                 Open HelloWorld demo
               </button>
-              <span className="text-[11px] text-emerald-200/80">
-                Opens a dialog that deploys and calls the TestNet HelloWorld
-                contract.
-              </span>
             </div>
 
             <div className="mt-2">
