@@ -493,7 +493,7 @@ const Home: React.FC = () => {
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div className="space-y-2">
               <h1 className="text-2xl md:text-3xl font-semibold text-emerald-300">
-                ⚡ Protius Protocol — First Demo
+                ⚡ Protius Protocol — Algorand Demo
               </h1>
               <p className="text-sm md:text-base text-emerald-100/80 max-w-2xl">
                 Register a renewable energy project, approve it, simulate
