@@ -59,9 +59,14 @@ export class ProtiusStaking extends Contract {
     assert(amount > Uint64(0));
 
     const staker = Txn.sender;
-    const userStake = this.stakeAmount(staker);
 
-    userStake.value = userStake.value + amount;
+    // Read current stake for this account
+    const current = this.stakeAmount(staker).value;
+
+    // Write back updated stake using the expression directly
+    this.stakeAmount(staker).value = current + amount;
+
+    // Update global total
     this.totalStaked.value = this.totalStaked.value + amount;
   }
 
@@ -112,6 +117,7 @@ export class ProtiusStaking extends Contract {
 
     assert(userStake > Uint64(0));
 
+    // Case 1: funding failed -> refund principal
     if (this.isFunded.value === Uint64(0)) {
       const now = Global.latestTimestamp;
       assert(now > this.stakingDeadline.value);
@@ -122,6 +128,7 @@ export class ProtiusStaking extends Contract {
       return userStake;
     }
 
+    // Case 2: funding succeeded & financial close reached -> pay premium share
     assert(this.financialCloseReached.value === Uint64(1));
 
     const flag = this.hasWithdrawn(caller).value;
