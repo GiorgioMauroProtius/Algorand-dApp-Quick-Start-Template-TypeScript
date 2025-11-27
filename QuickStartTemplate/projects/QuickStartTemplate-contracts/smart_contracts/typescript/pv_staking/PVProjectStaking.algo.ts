@@ -67,7 +67,10 @@ export class PVProjectStaking extends Contract {
     // Verify the asset transfer (USDC -> app address) from the caller
     assert(axferTxn.xferAsset.id === this.usdc.value, 'wrong asset');
     assert(axferTxn.sender === call.sender, 'wrong sender');
-    assert(axferTxn.assetReceiver === Global.currentApplicationAddress, 'wrong receiver');
+    assert(
+      axferTxn.assetReceiver === Global.currentApplicationAddress,
+      'wrong receiver'
+    );
     assert(axferTxn.assetAmount > 0, 'amount must be > 0');
 
     const amount = axferTxn.assetAmount;
@@ -80,8 +83,12 @@ export class PVProjectStaking extends Contract {
   confirmFundingSuccess(call: gtxn.ApplicationCallTxn): void {
     assert(Global.latestTimestamp > this.stakingDeadline.value, 'still open');
     assert(this.isFunded.value === 0, 'already funded');
-    assert(call.sender === this.developer.value, 'only developer');
-    assert(this.totalStaked.value >= this.minimumGoal.value, 'minimum not met');
+    // compare the caller's address (bytes) to the stored developer address
+    assert(call.sender.address === this.developer.value, 'only developer');
+    assert(
+      this.totalStaked.value >= this.minimumGoal.value,
+      'minimum not met'
+    );
 
     this.isFunded.value = Uint64(1);
   }
@@ -93,12 +100,19 @@ export class PVProjectStaking extends Contract {
   ): void {
     assert(this.isFunded.value === 1, 'not funded');
     assert(this.isClosed.value === 0, 'already closed');
-    assert(call.sender === this.developer.value, 'only developer');
+    // same fix here: compare address to stored bytes
+    assert(call.sender.address === this.developer.value, 'only developer');
 
     // Verify premium transfer (developer -> app)
     assert(premiumAxfer.xferAsset.id === this.usdc.value, 'wrong asset');
-    assert(premiumAxfer.sender === this.developer.value, 'wrong sender');
-    assert(premiumAxfer.assetReceiver === Global.currentApplicationAddress, 'wrong receiver');
+    assert(
+      premiumAxfer.sender.address === this.developer.value,
+      'wrong sender'
+    );
+    assert(
+      premiumAxfer.assetReceiver === Global.currentApplicationAddress,
+      'wrong receiver'
+    );
     assert(premiumAxfer.assetAmount > 0, 'premium must be > 0');
 
     this.isClosed.value = Uint64(1);
@@ -114,7 +128,10 @@ export class PVProjectStaking extends Contract {
 
     // Verify the refund transfer (app -> caller) for the exact owed amount
     assert(refundAxfer.xferAsset.id === this.usdc.value, 'wrong asset');
-    assert(refundAxfer.sender === Global.currentApplicationAddress, 'wrong sender');
+    assert(
+      refundAxfer.sender === Global.currentApplicationAddress,
+      'wrong sender'
+    );
     assert(refundAxfer.assetReceiver === call.sender, 'wrong receiver');
     assert(refundAxfer.assetAmount === owed, 'wrong amount');
 
