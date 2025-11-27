@@ -68,7 +68,7 @@ export class PVProjectStaking extends Contract {
     assert(axferTxn.xferAsset.id === this.usdc.value, 'wrong asset');
     assert(axferTxn.sender === call.sender, 'wrong sender');
     assert(
-      axferTxn.assetReceiver === Global.currentApplicationAddress,
+      axferTxn.assetReceiver.address === Global.currentApplicationAddress,
       'wrong receiver'
     );
     assert(axferTxn.assetAmount > 0, 'amount must be > 0');
@@ -83,7 +83,7 @@ export class PVProjectStaking extends Contract {
   confirmFundingSuccess(call: gtxn.ApplicationCallTxn): void {
     assert(Global.latestTimestamp > this.stakingDeadline.value, 'still open');
     assert(this.isFunded.value === 0, 'already funded');
-    // compare the caller's address (bytes) to the stored developer address
+    // compare caller address (bytes) to stored developer address (bytes)
     assert(call.sender.address === this.developer.value, 'only developer');
     assert(
       this.totalStaked.value >= this.minimumGoal.value,
@@ -100,7 +100,7 @@ export class PVProjectStaking extends Contract {
   ): void {
     assert(this.isFunded.value === 1, 'not funded');
     assert(this.isClosed.value === 0, 'already closed');
-    // same fix here: compare address to stored bytes
+    // same check here
     assert(call.sender.address === this.developer.value, 'only developer');
 
     // Verify premium transfer (developer -> app)
@@ -110,7 +110,7 @@ export class PVProjectStaking extends Contract {
       'wrong sender'
     );
     assert(
-      premiumAxfer.assetReceiver === Global.currentApplicationAddress,
+      premiumAxfer.assetReceiver.address === Global.currentApplicationAddress,
       'wrong receiver'
     );
     assert(premiumAxfer.assetAmount > 0, 'premium must be > 0');
@@ -129,7 +129,7 @@ export class PVProjectStaking extends Contract {
     // Verify the refund transfer (app -> caller) for the exact owed amount
     assert(refundAxfer.xferAsset.id === this.usdc.value, 'wrong asset');
     assert(
-      refundAxfer.sender === Global.currentApplicationAddress,
+      refundAxfer.sender.address === Global.currentApplicationAddress,
       'wrong sender'
     );
     assert(refundAxfer.assetReceiver === call.sender, 'wrong receiver');
