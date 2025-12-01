@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet-react";
 import ConnectWallet from "./components/ConnectWallet";
 import AppCalls from "./components/AppCalls";
+import ProtiusStakingPanel from "./components/ProtiusStakingPanel";
 
 type Project = {
   id: number;
@@ -1137,6 +1138,7 @@ const Home: React.FC = () => {
           ref={investorRef}
           className="grid md:grid-cols-[1.4fr,1.2fr] gap-6"
         >
+          {/* 3. Investor / staking demo ---------------------------------- */}
           <section className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm text-black font-semibold">
@@ -1147,9 +1149,8 @@ const Home: React.FC = () => {
               </h2>
             </div>
             <p className="text-xs text-emerald-100/80">
-              Imagine you are a community investor. Each approved project below
-              has its own demo staking panel. This is front-end only for now —
-              in the next step, the Protius staking smart contract will plug in.
+              Stake on approved projects using the Protius staking smart
+              contract (demo wire-up).
             </p>
 
             {approvedProjects.length > 0 ? (
@@ -1204,8 +1205,7 @@ const Home: React.FC = () => {
                         <span className="font-semibold">
                           {formatStake(p.totalStaked)} USDC
                         </span>{" "}
-                        —{" "}
-                        <span className="font-semibold">{p.stakers}</span>{" "}
+                        — <span className="font-semibold">{p.stakers}</span>{" "}
                         stakers
                       </div>
                     </div>
@@ -1218,8 +1218,14 @@ const Home: React.FC = () => {
                 demo.
               </p>
             )}
+
+            {/* Protius smart-contract placeholder panel */}
+            <div className="mt-4 pt-3 border-t border-emerald-500/30">
+              <ProtiusStakingPanel />
+            </div>
           </section>
 
+          {/* 4. HelloWorld panel ----------------------------------------- */}
           <section className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm text-black font-semibold">
