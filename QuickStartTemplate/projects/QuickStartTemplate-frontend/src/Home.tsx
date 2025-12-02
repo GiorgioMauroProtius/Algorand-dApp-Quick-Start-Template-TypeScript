@@ -322,6 +322,34 @@ const Home: React.FC = () => {
     return isNaN(num) ? 0 : num;
   };
 
+  // NEW: capacity display formatter (keep stored value, format number when showing)
+  const formatCapacityDisplay = (capacity: string) => {
+    if (!capacity) return "n/a";
+    const parts = capacity.split(" ");
+    if (parts.length === 0) return capacity;
+    const unit = parts[parts.length - 1];
+    const rawNumber = parts.slice(0, parts.length - 1).join(" ");
+    const cleaned = rawNumber.replace(/,/g, "").replace(/\s/g, "");
+    if (!cleaned) return capacity;
+    const num = Number(cleaned.replace(",", "."));
+    if (isNaN(num)) return capacity;
+    const formatted = num.toLocaleString("en-US", {
+      maximumFractionDigits: 2,
+    });
+    return `${formatted} ${unit}`;
+  };
+
+  // NEW: distance display formatter
+  const formatDistanceDisplay = (distance: string) => {
+    if (!distance) return "n/a";
+    const cleaned = distance.replace(/,/g, "").replace(/\s/g, "");
+    const num = Number(cleaned.replace(",", "."));
+    if (isNaN(num)) return distance;
+    return num.toLocaleString("en-US", {
+      maximumFractionDigits: 2,
+    });
+  };
+
   // effects -----------------------------------------------------
 
   // auto-fill developer wallet
@@ -1082,8 +1110,8 @@ const Home: React.FC = () => {
                         )}
                       </div>
                       <div className="text-emerald-200/80 truncate">
-                        {p.capacity} — {p.country} — {p.distanceKm || "n/a"} km
-                        to substation
+                        {formatCapacityDisplay(p.capacity)} — {p.country} —{" "}
+                        {formatDistanceDisplay(p.distanceKm)} km to substation
                       </div>
                       {p.userName && (
                         <div className="text-emerald-200/70">
@@ -1174,7 +1202,7 @@ const Home: React.FC = () => {
             </div>
             <p className="text-xs text-emerald-100/80">
               Stake on approved projects using the Protius staking smart
-              contract placeholder panel. This demo is front-end only for now —
+              contract placeholder panel. This demo is front-end only for now —{" "}
               next we wire it to the live contract.
             </p>
 
@@ -1193,7 +1221,8 @@ const Home: React.FC = () => {
                             {p.name}
                           </div>
                           <div className="text-xs text-emerald-200/80">
-                            {p.capacity} — {p.country || "Country"}
+                            {formatCapacityDisplay(p.capacity)} —{" "}
+                            {p.country || "Country"}
                           </div>
                         </div>
                       </div>
@@ -1301,8 +1330,10 @@ const Home: React.FC = () => {
                   {selectedProject.name}
                 </h3>
                 <p className="text-[11px] text-emerald-200/80">
-                  {selectedProject.capacity} — {selectedProject.country} —{" "}
-                  {selectedProject.distanceKm || "n/a"} km to substation
+                  {formatCapacityDisplay(selectedProject.capacity)} —{" "}
+                  {selectedProject.country} —{" "}
+                  {formatDistanceDisplay(selectedProject.distanceKm)} km to
+                  substation
                 </p>
               </div>
               <button
