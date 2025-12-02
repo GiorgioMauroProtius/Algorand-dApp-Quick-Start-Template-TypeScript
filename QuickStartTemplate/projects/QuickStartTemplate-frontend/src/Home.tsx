@@ -218,6 +218,24 @@ const COUNTRIES = [
 
 const STORAGE_KEY = "protius-demo-projects-v1";
 
+const DEMO_PROJECT: Project = {
+  id: 1,
+  developerWallet: "",
+  userName: "Giorgio Mauro",
+  name: "StromVec Solar 5 MW",
+  country: "South Africa",
+  capacity: "5 000 kW",
+  distanceKm: "12.5",
+  notes:
+    "Demo project pre-loaded for the Protius Algorand demo | Land status: Option / Other | Land zoning: Agricultural | Permits: Early-stage permitting | Pre-construction approvals: Grid connection in progress",
+  isApproved: true,
+  totalStaked: 0,
+  stakers: 0,
+  devCap: "5 000 000",
+  equity: "1 500 000",
+  debtRatioValue: "70",
+};
+
 const Home: React.FC = () => {
   const { activeAddress } = useWallet();
 
@@ -333,19 +351,24 @@ const Home: React.FC = () => {
     setEquityRequired(formatLargeNumber(equity.toString()));
   }, [devCapRequired, debtRatio, autoEquity]);
 
-  // load projects from localStorage on mount
+  // load projects from localStorage on mount (or seed demo project)
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const stored = window.localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Project[];
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           setProjects(parsed);
+          return;
         }
       }
+      // If nothing in storage, seed with a default StromVec demo project
+      setProjects([DEMO_PROJECT]);
     } catch (err) {
       console.error("Failed to load projects from storage", err);
+      // In case of error, still seed with demo project so the UI has something to show
+      setProjects([DEMO_PROJECT]);
     }
   }, []);
 
@@ -422,7 +445,8 @@ const Home: React.FC = () => {
       );
     } else {
       // create new project
-      const id = projects.length + 1;
+      const id =
+        projects.length === 0 ? 1 : Math.max(...projects.map((p) => p.id)) + 1;
 
       const newProject: Project = {
         id,
@@ -1150,7 +1174,8 @@ const Home: React.FC = () => {
             </div>
             <p className="text-xs text-emerald-100/80">
               Stake on approved projects using the Protius staking smart
-              contract (demo wire-up).
+              contract placeholder panel. This demo is front-end only for now —
+              next we wire it to the live contract.
             </p>
 
             {approvedProjects.length > 0 ? (
@@ -1205,7 +1230,8 @@ const Home: React.FC = () => {
                         <span className="font-semibold">
                           {formatStake(p.totalStaked)} USDC
                         </span>{" "}
-                        — <span className="font-semibold">{p.stakers}</span>{" "}
+                        —{" "}
+                        <span className="font-semibold">{p.stakers}</span>{" "}
                         stakers
                       </div>
                     </div>
