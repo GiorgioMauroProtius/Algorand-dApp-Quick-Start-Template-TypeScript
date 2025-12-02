@@ -15,6 +15,7 @@ interface AppCallsInterface {
 const AppCalls = ({ openModal, setModalState }: AppCallsInterface) => {
   const [loading, setLoading] = useState<boolean>(false)
   const [contractInput, setContractInput] = useState<string>('')
+  const [lastResponse, setLastResponse] = useState<string | null>(null)
   const { enqueueSnackbar } = useSnackbar()
   const { transactionSigner, activeAddress } = useWallet()
 
@@ -28,23 +29,24 @@ const AppCalls = ({ openModal, setModalState }: AppCallsInterface) => {
 
   const sendAppCall = async () => {
     if (!activeAddress || !transactionSigner) {
-      enqueueSnackbar('Please connect your wallet in the header before calling the contract.', {
+      enqueueSnackbar('[HelloWorld] Please connect your wallet in the header before calling the contract.', {
         variant: 'warning',
       })
       return
     }
 
     if (!contractInput.trim()) {
-      enqueueSnackbar('Please enter a value for the hello() input first.', {
+      enqueueSnackbar('[HelloWorld] Please enter a value for the hello() input first.', {
         variant: 'warning',
       })
       return
     }
 
     setLoading(true)
+    setLastResponse(null)
 
     try {
-      enqueueSnackbar('Deploying HelloWorld contract to Algorand TestNet…', {
+      enqueueSnackbar('[HelloWorld] Deploying demo contract to Algorand TestNet…', {
         variant: 'info',
       })
 
@@ -64,7 +66,7 @@ const AppCalls = ({ openModal, setModalState }: AppCallsInterface) => {
       })
 
       if (!deployResult) {
-        enqueueSnackbar('Deployment failed. Please check your wallet and try again.', {
+        enqueueSnackbar('[HelloWorld] Deployment failed. Please check your wallet and try again.', {
           variant: 'error',
         })
         return
@@ -73,7 +75,7 @@ const AppCalls = ({ openModal, setModalState }: AppCallsInterface) => {
       const { appClient } = deployResult
 
       enqueueSnackbar(
-        `Contract deployed successfully${
+        `[HelloWorld] Contract deployed successfully${
           (appClient as any)?.appId ? ` (App ID: ${(appClient as any).appId})` : ''
         }. Calling hello()…`,
         { variant: 'success' },
@@ -84,13 +86,16 @@ const AppCalls = ({ openModal, setModalState }: AppCallsInterface) => {
       })
 
       if (!response) {
-        enqueueSnackbar('No response received from the contract.', {
+        enqueueSnackbar('[HelloWorld] No response received from the contract.', {
           variant: 'warning',
         })
         return
       }
 
-      enqueueSnackbar(`HelloWorld response: ${response.return}`, {
+      const message = String((response as any).return ?? '')
+      setLastResponse(message)
+
+      enqueueSnackbar(`[HelloWorld] Response: ${message}`, {
         variant: 'success',
       })
 
@@ -99,9 +104,12 @@ const AppCalls = ({ openModal, setModalState }: AppCallsInterface) => {
       setModalState(false)
     } catch (e) {
       const err = e as Error
-      enqueueSnackbar(`Unexpected error during contract interaction: ${err.message || String(err)}`, {
-        variant: 'error',
-      })
+      enqueueSnackbar(
+        `[HelloWorld] Unexpected error during contract interaction: ${err.message || String(err)}`,
+        {
+          variant: 'error',
+        },
+      )
     } finally {
       setLoading(false)
     }
@@ -117,15 +125,17 @@ const AppCalls = ({ openModal, setModalState }: AppCallsInterface) => {
       <div className="modal-box bg-neutral-800 text-gray-100 rounded-2xl shadow-xl border border-neutral-700 p-6">
         <h3 className="flex items-center gap-3 text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500 mb-6">
           <AiOutlineDeploymentUnit className="text-3xl" />
-          Smart Contract Interaction
+          HelloWorld smart contract demo
         </h3>
 
         <div className="bg-neutral-700 p-4 rounded-xl mb-6">
-          <p className="flex items-center gap-2 text-sm text-gray-400">
+          <p className="flex items-center gap-2 text-sm text-gray-300">
             <AiOutlineWarning className="text-xl text-yellow-400" />
             <span>
-              <strong>Note:</strong> This demo deploys the contract from the frontend. In production you
-              would typically deploy it once (via backend or devops) and reference it by its app ID.
+              <strong>Note:</strong> This demo deploys the{' '}
+              <span className="font-mono">HelloWorld</span> contract directly from your browser. In a
+              real Protius flow you would typically deploy once (via backend or devops) and reference
+              it by its app ID.
             </span>
           </p>
         </div>
@@ -144,6 +154,24 @@ const AppCalls = ({ openModal, setModalState }: AppCallsInterface) => {
             }}
           />
         </div>
+
+        {lastResponse && (
+          <div className="mt-6 rounded-xl border border-emerald-500/40 bg-emerald-900/40 px-4 py-3 text-sm text-emerald-50">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-emerald-100 mb-1">Latest HelloWorld response</p>
+                <p className="text-xs text-emerald-50/90 break-words">{lastResponse}</p>
+              </div>
+              <button
+                type="button"
+                className="text-[11px] underline underline-offset-2 text-emerald-200 hover:text-emerald-50"
+                onClick={() => setLastResponse(null)}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="modal-action mt-6 flex flex-col-reverse sm:flex-row-reverse gap-3">
           <button
