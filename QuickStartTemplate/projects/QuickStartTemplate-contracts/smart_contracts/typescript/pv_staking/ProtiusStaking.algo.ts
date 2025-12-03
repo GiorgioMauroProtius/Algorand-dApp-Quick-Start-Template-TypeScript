@@ -22,7 +22,9 @@ import {
  * Later we can extend this to multi-project using BoxMap or multiple apps.
  */
 
-@contract
+@contract({
+  name: 'ProtiusStaking',
+})
 export class ProtiusStaking extends Contract {
   // ----------------------------
   // Global state (single pool)
