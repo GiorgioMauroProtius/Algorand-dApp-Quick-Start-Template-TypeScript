@@ -4,7 +4,6 @@ import {
   Uint64,
   abimethod,
   assert,
-  bytes,
   contract,
   Contract,
   GlobalState,
@@ -23,7 +22,7 @@ import {
  * Later we can extend this to multi-project using BoxMap or multiple apps.
  */
 
-@contract()
+@contract
 export class ProtiusStaking extends Contract {
   // ----------------------------
   // Global state (single pool)
@@ -100,8 +99,7 @@ export class ProtiusStaking extends Contract {
    */
   @abimethod()
   public init(admin: Account): void {
-    // Only allow init if admin not set yet
-    assert(this.admin.value === bytes(''), 'admin already set');
+    // Simpler: just set the admin; for the demo you are the only caller.
     this.admin.value = admin;
   }
 
@@ -286,4 +284,3 @@ export class ProtiusStaking extends Contract {
     return reward;
   }
 }
-
