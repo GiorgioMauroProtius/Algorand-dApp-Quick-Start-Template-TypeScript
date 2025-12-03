@@ -232,24 +232,8 @@ export class ProtiusStaking extends Contract {
     return this.totalStaked.value;
   }
 
-  @abimethod({ readonly: true })
-  getConfig(): {
-    admin: Account;
-    devCap: uint64;
-    rewardPool: uint64;
-    rewardsLocked: uint64;
-    stakingOpen: uint64;
-    totalStaked: uint64;
-  } {
-    return {
-      admin: this.admin.value,
-      devCap: this.devCap.value,
-      rewardPool: this.rewardPool.value,
-      rewardsLocked: this.rewardsLocked.value,
-      stakingOpen: this.stakingOpen.value,
-      totalStaked: this.totalStaked.value,
-    };
-  }
+  // (getConfig removed from ABI to satisfy compiler — we can re-add later
+  //  as separate view methods if needed.)
 
   // -------------------------------------------------------------
   // Reward distribution
@@ -284,8 +268,8 @@ export class ProtiusStaking extends Contract {
 
     const pool = this.rewardPool.value;
 
-    // integer division, as usual on AVM
-    const reward = (pool * stake) / total;
+    // Typed as uint64 so the compiler doesn’t infer `number`
+    const reward: uint64 = (pool * stake) / total;
 
     // mark as claimed
     this.hasClaimed(sender).value = Uint64(1);
