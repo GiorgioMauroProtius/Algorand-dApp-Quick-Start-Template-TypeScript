@@ -12,7 +12,7 @@ import {
 } from '@algorandfoundation/algorand-typescript';
 
 /**
- * ProtiusStaking — Clean, compiler-safe TypeScript smart contract
+ * ProtiusStaking — TypeScript smart contract
  *
  * Supports:
  *  - stake()
@@ -26,31 +26,45 @@ import {
  *  - claimRewards()
  */
 
-@contract({ name: 'ProtiusStaking' })
+@(contract as any)({ name: 'ProtiusStaking' })
 export class ProtiusStaking extends Contract {
   // -------------------------------------------------------------
   // Global State
   // -------------------------------------------------------------
 
+  /** Admin wallet (project sponsor / Protius) */
   admin = GlobalState<Account>({
     key: 'admin',
   });
 
+  /** Total dev capital that was staked into the project (e.g. 1 000 000) */
   devCap = GlobalState<uint64>({
     key: 'devCap',
     initialValue: Uint64(0),
   });
 
+  /** Total currently staked (sum of all wallets) */
   totalStaked = GlobalState<uint64>({
     key: 'totalStaked',
     initialValue: Uint64(0),
   });
 
+  /**
+   * Reward pool to share among stakers.
+   * This is where the human-in-the-loop comes in:
+   *  - For “2× money” you would set rewardPool = devCap * 2.
+   *  - For negotiated premiums, set rewardPool = custom value.
+   */
   rewardPool = GlobalState<uint64>({
     key: 'rewardPool',
     initialValue: Uint64(0),
   });
 
+  /**
+   * Rewards locked flag:
+   * 0 = rewards not yet locked (admin may still change rewardPool)
+   * 1 = rewards locked (no more changes to rewardPool; claiming enabled)
+   */
   rewardsLocked = GlobalState<uint64>({
     key: 'rewardsLocked',
     initialValue: Uint64(0),
@@ -60,8 +74,13 @@ export class ProtiusStaking extends Contract {
   // Local State (per staker)
   // -------------------------------------------------------------
 
+  /** Amount this wallet has staked into the pool */
   stakeAmount = LocalState<uint64>({ key: 'stake' });
 
+  /**
+   * Has this wallet already claimed rewards?
+   * 0 = not claimed; 1 = already claimed
+   */
   hasClaimed = LocalState<uint64>({ key: 'claimed' });
 
   // -------------------------------------------------------------
@@ -80,6 +99,9 @@ export class ProtiusStaking extends Contract {
   // Lifecycle
   // -------------------------------------------------------------
 
+  /**
+   * Initialise contract with admin wallet (your Pera address for the demo).
+   */
   @abimethod()
   init(admin: Account): void {
     this.admin.value = admin;
@@ -89,12 +111,18 @@ export class ProtiusStaking extends Contract {
   // Admin methods
   // -------------------------------------------------------------
 
+  /** Set / update development capital total (e.g. 1 000 000) */
   @abimethod()
   setDevCap(amount: uint64): void {
     this.onlyAdmin();
     this.devCap.value = amount;
   }
 
+  /**
+   * Set / update reward pool before locking.
+   *  - For 2× money: rewardPool = devCap * 2
+   *  - For custom premium: rewardPool = negotiated amount
+   */
   @abimethod()
   setRewardPool(amount: uint64): void {
     this.onlyAdmin();
@@ -102,6 +130,7 @@ export class ProtiusStaking extends Contract {
     this.rewardPool.value = amount;
   }
 
+  /** Lock rewards at Financial Close; after this, pool is fixed. */
   @abimethod()
   lockRewards(): void {
     this.onlyAdmin();
@@ -109,22 +138,28 @@ export class ProtiusStaking extends Contract {
     this.rewardsLocked.value = Uint64(1);
   }
 
+  /**
+   * Marker function to match your flow:
+   *  setDevCap → setRewardPool → distributeRewards → lockRewards → claimRewards
+   */
   @abimethod()
   distributeRewards(): void {
     this.onlyAdmin();
     assert(this.rewardPool.value > Uint64(0), 'set rewardPool first');
-    // No state update needed — reward is calculated in claimRewards()
+    // No state update needed — reward is computed in claimRewards()
   }
 
   // -------------------------------------------------------------
   // Staking
   // -------------------------------------------------------------
 
+  /** Standard ARC-4 opt-in so we can use LocalState for the account */
   @abimethod({ allowActions: 'OptIn' })
   optIn(): void {
     // no body needed
   }
 
+  /** Add stake to the pool (accounting only in v1) */
   @abimethod()
   stake(amount: uint64): void {
     assert(this.rewardsLocked.value === Uint64(0), 'staking closed');
@@ -137,6 +172,10 @@ export class ProtiusStaking extends Contract {
     this.totalStaked.value = this.totalStaked.value + amount;
   }
 
+  /**
+   * Soft-unstake to reduce stake (early exit).
+   * Real-world settlement (replacement staker, exit fee) is handled off-chain.
+   */
   @abimethod()
   requestUnstake(amount: uint64): void {
     assert(amount > Uint64(0), 'amount must be > 0');
@@ -185,6 +224,16 @@ export class ProtiusStaking extends Contract {
   // Claim Rewards
   // -------------------------------------------------------------
 
+  /**
+   * Claim this wallet’s share of the rewardPool once locked.
+   *
+   * reward = rewardPool * stake(sender) / totalStaked
+   *
+   * For v1 we:
+   *  - compute entitlement on-chain
+   *  - mark hasClaimed so it can’t be double-claimed
+   *  - return the entitlement (off-chain payout in demo)
+   */
   @abimethod()
   claimRewards(): uint64 {
     this.assertRewardsLocked();
