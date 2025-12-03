@@ -1,304 +1,297 @@
-// QuickStartTemplate-contracts/smart_contracts/typescript/pv_staking/ProtiusStaking.algo.ts
-
 import {
+  Uint64,
+  abimethod,
+  assert,
+  Contract,
   GlobalState,
   LocalState,
-  Uint64,
-  uint64,
   Txn,
-  Global,
-  Bytes,
-  Account,
-  assert,
-  arc4,
-} from '@algorandfoundation/algorand-typescript'
+  type Account,
+  type uint64,
+} from '@algorandfoundation/algorand-typescript';
 
 /**
- * ProtiusStaking
+ * ProtiusStaking — single-pool staking contract for the demo
  *
- * Simplified single-pool staking contract, tuned for the demo:
- *
- * - Stake / unstake while staking is open
- * - At Financial Close, admin calls distributeRewards(projectId, devCapAtFC, premiumAmount)
- *   (e.g. devCapAtFC = 1_000_000, premiumAmount = 1_000_000 for “2x money”)
- * - Rewards are computed per staker as:
- *
- *      grossReward = stakeAmount * premiumAmount / devCapAtFC
- *      claimable   = max(0, grossReward - alreadyClaimed)
- *
- * - claimRewards(projectId) lets each staker pull their own rewards
- *   (for now this just tracks amounts on-chain; next step is wiring
- *   to an escrow / ASA transfer).
+ * Flow:
+ *  1. Stakers call stake(projectId, amount) while the pool is open.
+ *  2. (Optional) They can reduce stake via requestUnstake(projectId, amount)
+ *     while staking is open.
+ *  3. At Financial Close, admin calls:
+ *        setDevCap(devCapAtFC)
+ *        setRewardPool(premiumAmount)   // e.g. same as devCap for "2x money"
+ *        distributeRewards(projectId)   // marker
+ *        lockRewards()
+ *  4. Stakers call claimRewards(projectId) to get their share:
+ *        reward = rewardPool * stake(sender) / totalStaked
  */
 
-export default class ProtiusStaking extends arc4.Contract {
-  // -----------------------------
-  // Global state
-  // -----------------------------
+export class ProtiusStaking extends Contract {
+  // -------------------------------------------------------------
+  // Global State
+  // -------------------------------------------------------------
 
-  /**
-   * Total amount staked in the pool (sum of all stakers’ stakeAmount)
-   */
-  public totalStaked = GlobalState<uint64>({
-    key: Bytes('total_staked'),
+  /** Admin wallet (project sponsor / Protius) */
+  admin = GlobalState<Account>({ key: 'admin' });
+
+  /** Total dev capital that was staked into the project (at FC) */
+  devCap = GlobalState<uint64>({ key: 'devCap', initialValue: Uint64(0) });
+
+  /** Total currently staked (sum of all wallets) */
+  totalStaked = GlobalState<uint64>({
+    key: 'totalStaked',
     initialValue: Uint64(0),
-  })
+  });
 
   /**
-   * Development capital at Financial Close (human-in-the-loop input)
+   * Reward pool to share among stakers.
+   * Example:
+   *  - devCap = 1_000_000
+   *  - rewardPool = 1_000_000  (for "2x money")
+   * or any other negotiated premium amount.
+   */
+  rewardPool = GlobalState<uint64>({
+    key: 'rewardPool',
+    initialValue: Uint64(0),
+  });
+
+  /**
+   * Rewards locked flag:
+   * 0 = rewards not yet locked (admin may still change rewardPool)
+   * 1 = rewards locked (no more changes to rewardPool; claiming enabled)
+   */
+  rewardsLocked = GlobalState<uint64>({
+    key: 'rewardsLocked',
+    initialValue: Uint64(0),
+  });
+
+  /**
+   * Staking open flag:
+   * 1 = staking open (stake / requestUnstake allowed)
+   * 0 = staking closed (after lockRewards)
+   */
+  stakingOpen = GlobalState<uint64>({
+    key: 'stakingOpen',
+    initialValue: Uint64(1),
+  });
+
+  // -------------------------------------------------------------
+  // Local State (per staker)
+  // -------------------------------------------------------------
+
+  /** Amount this wallet has staked into the pool */
+  stakeAmount = LocalState<uint64>({ key: 'stake' });
+
+  /**
+   * Has this wallet already claimed rewards?
+   * 0 = not claimed; 1 = already claimed
+   */
+  hasClaimed = LocalState<uint64>({ key: 'claimed' });
+
+  // -------------------------------------------------------------
+  // Helpers
+  // -------------------------------------------------------------
+
+  private onlyAdmin() {
+    assert(
+      Txn.sender === this.admin.value,
+      'only admin can call this method'
+    );
+  }
+
+  private ensureRewardsLocked() {
+    assert(this.rewardsLocked.value === Uint64(1), 'rewards not locked yet');
+  }
+
+  // -------------------------------------------------------------
+  // Lifecycle / configuration
+  // -------------------------------------------------------------
+
+  /**
+   * Called once after deploy to set the admin wallet.
+   * For the demo this will be your Pera wallet.
+   */
+  @abimethod()
+  init(admin: Account): void {
+    this.admin.value = admin;
+  }
+
+  /**
+   * Admin sets / updates the dev cap (total development capital).
    * Example: 1_000_000
    */
-  public devCapAtFC = GlobalState<uint64>({
-    key: Bytes('dev_cap_fc'),
-    initialValue: Uint64(0),
-  })
-
-  /**
-   * Premium pool to be distributed to stakers
-   * Example for “2x money”: premiumAmount = devCapAtFC
-   */
-  public premiumAmount = GlobalState<uint64>({
-    key: Bytes('premium'),
-    initialValue: Uint64(0),
-  })
-
-  /**
-   * Has the reward configuration been set already?
-   * 0 = not configured, 1 = configured
-   */
-  public rewardsConfigured = GlobalState<uint64>({
-    key: Bytes('rewards_cfg'),
-    initialValue: Uint64(0),
-  })
-
-  /**
-   * Staking open flag
-   * 1 = staking open (stake / unstake allowed)
-   * 0 = staking closed (after distributeRewards is called)
-   */
-  public stakingOpen = GlobalState<uint64>({
-    key: Bytes('staking_open'),
-    initialValue: Uint64(1),
-  })
-
-  // -----------------------------
-  // Local state (per account)
-  // -----------------------------
-
-  /**
-   * Amount staked by each account
-   */
-  public stakeAmount = LocalState<uint64>({
-    key: Bytes('stake_amt'),
-  })
-
-  /**
-   * How much reward this account has already claimed
-   */
-  public claimedReward = LocalState<uint64>({
-    key: Bytes('claimed'),
-  })
-
-  // -----------------------------
-  // Internal helpers
-  // -----------------------------
-
-  /**
-   * Only the contract creator (admin) may call certain methods.
-   */
-  private ensureAdmin(): void {
-    assert(Txn.sender === Global.creatorAddress, 'only admin can call this method')
+  @abimethod()
+  setDevCap(amount: uint64): void {
+    this.onlyAdmin();
+    this.devCap.value = amount;
   }
 
   /**
-   * Compute the *total* reward allocated for a given account
-   * based on their stake and the configured devCapAtFC / premiumAmount.
+   * Admin sets or updates the reward pool *before* locking.
    *
-   * Uses integer division – no decimals on-chain.
+   * For “2× money”: rewardPool = devCap
+   * For custom premium: rewardPool = negotiated value
    */
-  private computeTotalRewardFor(account: Account): uint64 {
-    if (this.rewardsConfigured.value === Uint64(0)) {
-      return Uint64(0)
-    }
-
-    const staked = this.stakeAmount(account).value
-    if (staked === Uint64(0)) {
-      return Uint64(0)
-    }
-
-    const devCap = this.devCapAtFC.value
-    const premium = this.premiumAmount.value
-
-    if (devCap === Uint64(0)) {
-      return Uint64(0)
-    }
-
-    // totalReward = stakeAmount * premium / devCap
-    return (staked * premium) / devCap
+  @abimethod()
+  setRewardPool(amount: uint64): void {
+    this.onlyAdmin();
+    assert(this.rewardsLocked.value === Uint64(0), 'rewards already locked');
+    this.rewardPool.value = amount;
   }
 
   /**
-   * Compute the *currently claimable* reward for an account:
-   * max(0, totalReward - claimedReward)
+   * Admin locks the reward pool at Financial Close.
+   * After this:
+   *  - rewardPool cannot change
+   *  - stakingOpen = 0
+   *  - stakers can call claimRewards()
    */
-  private computePendingRewardFor(account: Account): uint64 {
-    const totalReward = this.computeTotalRewardFor(account)
-    const alreadyClaimed = this.claimedReward(account).value
-
-    if (totalReward <= alreadyClaimed) {
-      return Uint64(0)
-    }
-
-    return totalReward - alreadyClaimed
+  @abimethod()
+  lockRewards(): void {
+    this.onlyAdmin();
+    assert(this.rewardPool.value > Uint64(0), 'reward pool must be > 0');
+    this.rewardsLocked.value = Uint64(1);
+    this.stakingOpen.value = Uint64(0);
   }
 
-  // -----------------------------
-  // ABI methods
-  // -----------------------------
+  /**
+   * Admin-only “marker” function so the flow matches your mental model:
+   *
+   *  1. setDevCap(1_000_000)
+   *  2. setRewardPool(1_000_000)  // or any negotiated premium
+   *  3. distributeRewards(projectId)  // just a marker
+   *  4. lockRewards()
+   *  5. stakers call claimRewards(projectId)
+   */
+  @abimethod()
+  distributeRewards(projectId: uint64): void {
+    this.onlyAdmin();
+    assert(this.rewardPool.value > Uint64(0), 'reward pool must be set first');
+    // No on-chain state change needed here; we keep payout logic in claimRewards()
+  }
+
+  // -------------------------------------------------------------
+  // Staker actions
+  // -------------------------------------------------------------
+
+  /** Standard ARC-4 opt-in so we can use LocalState for this account */
+  @abimethod({ allowActions: 'OptIn' })
+  optIn(): void {
+    // no body needed
+  }
 
   /**
-   * Stake into the pool.
+   * Stake an amount into the pool.
    *
    * projectId is accepted for ABI compatibility with the front-end
-   * but this contract currently manages a single pool per app instance.
+   * but this contract currently manages a single pool per app.
    */
-  @arc4.abimethod
-  public stake(projectId: uint64, amount: uint64): void {
-    // Only allow staking while the pool is open
-    assert(this.stakingOpen.value === Uint64(1), 'staking is closed')
-    assert(amount > Uint64(0), 'stake amount must be > 0')
+  @abimethod()
+  stake(projectId: uint64, amount: uint64): void {
+    assert(this.stakingOpen.value === Uint64(1), 'staking is closed');
+    assert(amount > Uint64(0), 'amount must be > 0');
 
-    const sender = Txn.sender
+    const sender = Txn.sender;
+    const currentStake = this.stakeAmount(sender).value;
 
-    // Require opt-in first (good practice, and aligns with LocalState pattern)
-    assert(
-      sender.isOptedIn(Global.currentApplicationId),
-      'account must opt in before staking',
-    )
-
-    const current = this.stakeAmount(sender).value
-
-    this.stakeAmount(sender).value = current + amount
-    this.totalStaked.value = this.totalStaked.value + amount
+    this.stakeAmount(sender).value = currentStake + amount;
+    this.totalStaked.value = this.totalStaked.value + amount;
   }
 
   /**
-   * Unstake from the pool.
+   * Request to reduce stake (early exit).
    *
-   * For now, we implement the “safe” version:
-   * - Unstake is only allowed while stakingOpen == 1
-   * - After distributeRewards is called (stakingOpen = 0),
-   *   unstake is disabled (you then exit via rewards).
-   *
-   * The more complex “replacement staker” logic you described
-   * can be layered on top later.
+   * For v1, we allow unstake only while staking is open.
+   * After lockRewards(), unstake is disabled and stakers
+   * exit via claimRewards().
    */
-  @arc4.abimethod
-  public unstake(projectId: uint64, amount: uint64): void {
-    assert(this.stakingOpen.value === Uint64(1), 'unstaking disabled after lock')
-    assert(amount > Uint64(0), 'unstake amount must be > 0')
+  @abimethod()
+  requestUnstake(projectId: uint64, amount: uint64): void {
+    assert(this.stakingOpen.value === Uint64(1), 'unstake disabled after lock');
+    assert(amount > Uint64(0), 'amount must be > 0');
 
-    const sender = Txn.sender
+    const sender = Txn.sender;
+    const currentStake = this.stakeAmount(sender).value;
+    assert(currentStake >= amount, 'cannot unstake more than current stake');
 
-    assert(
-      sender.isOptedIn(Global.currentApplicationId),
-      'account must opt in before unstaking',
-    )
-
-    const current = this.stakeAmount(sender).value
-    assert(current >= amount, 'not enough staked to unstake')
-
-    this.stakeAmount(sender).value = current - amount
-    this.totalStaked.value = this.totalStaked.value - amount
+    this.stakeAmount(sender).value = currentStake - amount;
+    this.totalStaked.value = this.totalStaked.value - amount;
   }
 
-  /**
-   * Read the stake for a specific wallet.
-   */
-  @arc4.abimethod({ readonly: true })
-  public getStake(projectId: uint64, staker: Account): uint64 {
-    return this.stakeAmount(staker).value
+  // -------------------------------------------------------------
+  // Views
+  // -------------------------------------------------------------
+
+  @abimethod({ readonly: true })
+  getStake(projectId: uint64, account: Account): uint64 {
+    return this.stakeAmount(account).value;
   }
 
-  /**
-   * Read the total staked in the pool.
-   */
-  @arc4.abimethod({ readonly: true })
-  public getTotalStaked(projectId: uint64): uint64 {
-    return this.totalStaked.value
+  @abimethod({ readonly: true })
+  getTotalStaked(projectId: uint64): uint64 {
+    return this.totalStaked.value;
   }
 
-  /**
-   * Admin-only:
-   * Configure rewards at Financial Close and lock the pool.
-   *
-   * devCapAtFC      - total development capital actually spent (e.g. 1_000_000)
-   * premiumAmount   - premium to be shared with stakers (e.g. 1_000_000 for 2x money)
-   *
-   * After this:
-   *  - stakingOpen = 0 (no more stake/unstake)
-   *  - rewardsConfigured = 1
-   *
-   * The ratio is: premiumAmount / devCapAtFC
-   */
-  @arc4.abimethod
-  public distributeRewards(
-    projectId: uint64,
-    devCapAtFC: uint64,
-    premiumAmount: uint64,
-  ): void {
-    this.ensureAdmin()
-
-    assert(this.rewardsConfigured.value === Uint64(0), 'rewards already configured')
-    assert(devCapAtFC > Uint64(0), 'devCapAtFC must be > 0')
-
-    this.devCapAtFC.value = devCapAtFC
-    this.premiumAmount.value = premiumAmount
-    this.rewardsConfigured.value = Uint64(1)
-
-    // Close staking from this point
-    this.stakingOpen.value = Uint64(0)
+  @abimethod({ readonly: true })
+  getConfig(): {
+    admin: Account;
+    devCap: uint64;
+    rewardPool: uint64;
+    rewardsLocked: uint64;
+    stakingOpen: uint64;
+    totalStaked: uint64;
+  } {
+    return {
+      admin: this.admin.value,
+      devCap: this.devCap.value,
+      rewardPool: this.rewardPool.value,
+      rewardsLocked: this.rewardsLocked.value,
+      stakingOpen: this.stakingOpen.value,
+      totalStaked: this.totalStaked.value,
+    };
   }
 
-  /**
-   * Read the pending (unclaimed) reward for any wallet.
-   */
-  @arc4.abimethod({ readonly: true })
-  public getPendingReward(projectId: uint64, staker: Account): uint64 {
-    return this.computePendingRewardFor(staker)
-  }
+  // -------------------------------------------------------------
+  // Reward distribution
+  // -------------------------------------------------------------
 
   /**
-   * Claim rewards for the sender.
+   * Claim this wallet’s share of the locked reward pool.
    *
-   * For now this *only* updates bookkeeping on-chain and returns
-   * the claimed amount; it doesn’t move any ASA/USDC yet.
+   * reward = rewardPool * stake(sender) / totalStaked
    *
-   * The front-end can read the returned value and present it
-   * as “claimable premium” in the UI. Later, we can wire this
-   * to an escrow and inner asset transfers.
+   * For v1 we:
+   *  - compute the entitlement on-chain
+   *  - mark `hasClaimed` so it can't be double-claimed
+   *  - return the amount to the caller
+   *
+   * The actual USDC payment can be off-chain in the demo (e.g. bank transfer
+   * or a separate ASA payout app that uses this entitlement as reference).
    */
-  @arc4.abimethod
-  public claimRewards(projectId: uint64): uint64 {
-    assert(this.rewardsConfigured.value === Uint64(1), 'rewards not configured yet')
+  @abimethod()
+  claimRewards(projectId: uint64): uint64 {
+    this.ensureRewardsLocked();
 
-    const sender = Txn.sender
+    const sender = Txn.sender;
 
-    assert(
-      sender.isOptedIn(Global.currentApplicationId),
-      'account must opt in before claiming',
-    )
+    assert(this.hasClaimed(sender).value === Uint64(0), 'already claimed');
 
-    const pending = this.computePendingRewardFor(sender)
-    if (pending === Uint64(0)) {
-      return Uint64(0)
-    }
+    const stake = this.stakeAmount(sender).value;
+    assert(stake > Uint64(0), 'no stake to claim rewards for');
 
-    const alreadyClaimed = this.claimedReward(sender).value
-    this.claimedReward(sender).value = alreadyClaimed + pending
+    const total = this.totalStaked.value;
+    assert(total > Uint64(0), 'no stakers');
 
-    // NOTE: no actual asset transfer yet – this is just accounting.
-    // Next iteration: wire to USDC ASA + inner transactions.
-    return pending
+    const pool = this.rewardPool.value;
+
+    // integer division, as usual on AVM
+    const reward = (pool * stake) / total;
+
+    // mark as claimed
+    this.hasClaimed(sender).value = Uint64(1);
+
+    // In a future version, we could transfer ASA/ALGO here.
+    // For v1, simply return the entitlement.
+    return reward;
   }
 }
