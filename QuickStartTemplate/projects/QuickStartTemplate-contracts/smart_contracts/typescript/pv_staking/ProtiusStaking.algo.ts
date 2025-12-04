@@ -92,14 +92,14 @@ export class ProtiusStaking extends Contract {
   // Helpers
   // -------------------------------------------------------------
 
-  private onlyAdmin() {
+  private onlyAdmin(): void {
     assert(
       Txn.sender === this.admin.value,
       'only admin can call this method'
     );
   }
 
-  private ensureRewardsLocked() {
+  private ensureRewardsLocked(): void {
     assert(this.rewardsLocked.value === Uint64(1), 'rewards not locked yet');
   }
 
@@ -232,8 +232,7 @@ export class ProtiusStaking extends Contract {
     return this.totalStaked.value;
   }
 
-  // (getConfig removed from ABI to satisfy compiler — we can re-add later
-  //  as separate view methods if needed.)
+  // (getConfig removed from ABI – returning an object is not allowed)
 
   // -------------------------------------------------------------
   // Reward distribution
@@ -268,7 +267,7 @@ export class ProtiusStaking extends Contract {
 
     const pool = this.rewardPool.value;
 
-    // Typed as uint64 so the compiler doesn’t infer `number`
+    // integer division, with explicit uint64 typing
     const reward: uint64 = (pool * stake) / total;
 
     // mark as claimed
