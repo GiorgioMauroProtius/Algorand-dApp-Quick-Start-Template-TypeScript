@@ -232,7 +232,7 @@ export class ProtiusStaking extends Contract {
     return this.totalStaked.value;
   }
 
-  // (getConfig removed from ABI – returning an object is not allowed)
+  // (NO getConfig() here – that was what the compiler complained about before)
 
   // -------------------------------------------------------------
   // Reward distribution
@@ -242,14 +242,6 @@ export class ProtiusStaking extends Contract {
    * Claim this wallet’s share of the locked reward pool.
    *
    * reward = rewardPool * stake(sender) / totalStaked
-   *
-   * For v1 we:
-   *  - compute the entitlement on-chain
-   *  - mark `hasClaimed` so it can't be double-claimed
-   *  - return the amount to the caller
-   *
-   * The actual USDC payment can be off-chain in the demo (e.g. bank transfer
-   * or a separate ASA payout app that uses this entitlement as reference).
    */
   @abimethod()
   claimRewards(projectId: uint64): uint64 {
@@ -273,8 +265,6 @@ export class ProtiusStaking extends Contract {
     // mark as claimed
     this.hasClaimed(sender).value = Uint64(1);
 
-    // In a future version, we could transfer ASA/ALGO here.
-    // For v1, simply return the entitlement.
     return reward;
   }
 }
