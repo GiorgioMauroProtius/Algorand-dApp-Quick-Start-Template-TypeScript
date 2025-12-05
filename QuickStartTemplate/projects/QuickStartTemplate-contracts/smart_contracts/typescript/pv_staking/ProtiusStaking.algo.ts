@@ -168,9 +168,13 @@ export class ProtiusStaking extends Contract {
    * For the demo this will be your Pera wallet.
    */
   @abimethod()
-  init(admin: Account): void {
-    this.admin.value = admin;
-  }
+init(admin: Account): void {
+  this.admin.value = admin;
+
+  // TEMP: arithmetic test for puya-ts
+  const test: uint64 = Uint64(100) - Uint64(40);
+}
+
 
   /**
    * Admin sets / updates the dev cap (total development capital).
