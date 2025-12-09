@@ -1,5 +1,5 @@
 import { AlgorandClient } from '@algorandfoundation/algokit-utils';
-import { getAlgodConfigFromViteEnvironment } from './QuickStartTemplate/config';
+import { getAlgodConfigFromViteEnvironment } from '../../QuickStartTemplate-frontend/src/config';
 import { ProtiusStakingFactory } from './ProtiusStaking.contract';
 
 async function main() {
