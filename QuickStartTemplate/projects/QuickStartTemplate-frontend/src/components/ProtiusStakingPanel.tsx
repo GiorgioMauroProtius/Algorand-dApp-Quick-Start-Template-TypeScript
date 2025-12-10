@@ -4,14 +4,22 @@ import {
   fetchStakingState,
   stake as stakeApi,
   withdraw as withdrawApi,
+  setPayoutMode,
   isDemoMode,
   type StakingState,
+  type ClaimMode,
 } from "../contracts/protiusStakingApi";
 
+/* -------------------------------
+   Formatting helpers
+------------------------------- */
 const formatBigInt = (value: bigint): string => {
   return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
+/* -------------------------------
+   Main Component
+------------------------------- */
 const ProtiusStakingPanel: React.FC = () => {
   const { activeAddress, isReady } = useWallet();
 
@@ -23,7 +31,9 @@ const ProtiusStakingPanel: React.FC = () => {
 
   const demo = isDemoMode();
 
-  // Load staking state whenever the wallet becomes ready + connected
+  /* -------------------------------
+     Load staking state
+  ------------------------------- */
   useEffect(() => {
     if (!isReady || !activeAddress) {
       setStakingState(null);
@@ -35,7 +45,6 @@ const ProtiusStakingPanel: React.FC = () => {
     (async () => {
       await loadState();
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady, activeAddress]);
 
   const loadState = async () => {
@@ -53,6 +62,9 @@ const ProtiusStakingPanel: React.FC = () => {
     }
   };
 
+  /* -------------------------------
+     Parsing helpers
+  ------------------------------- */
   const parseAmount = (): number | null => {
     const trimmed = amount.trim();
     if (!trimmed) return null;
@@ -61,6 +73,9 @@ const ProtiusStakingPanel: React.FC = () => {
     return asNumber;
   };
 
+  /* -------------------------------
+     Stake / Withdraw handlers
+  ------------------------------- */
   const handleStake = async () => {
     if (!activeAddress) {
       setMessage("Connect a wallet first.");
@@ -117,6 +132,31 @@ const ProtiusStakingPanel: React.FC = () => {
     }
   };
 
+  /* -------------------------------
+     Mode switch: Cash / Equity
+  ------------------------------- */
+  const handleModeChange = async (mode: ClaimMode) => {
+    if (!activeAddress) return;
+
+    try {
+      setIsBusy(true);
+      setMessage("Updating payout mode…");
+      setError(null);
+
+      const state = await setPayoutMode(activeAddress, mode);
+      setStakingState(state);
+      setMessage(`Payout mode updated to: ${mode.toUpperCase()}`);
+    } catch (err) {
+      console.error("[ProtiusStakingPanel] Mode change failed", err);
+      setError("Unable to update payout mode.");
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  /* -------------------------------
+     Render
+  ------------------------------- */
   return (
     <div className="rounded-lg border border-emerald-500/40 bg-slate-900/80 p-4 space-y-3 text-sm text-emerald-50">
       {/* Header + mode badge */}
@@ -131,10 +171,9 @@ const ProtiusStakingPanel: React.FC = () => {
 
       <p className="text-[11px] text-emerald-100/85">
         This panel simulates the{" "}
-        <span className="font-semibold">ProtiusStaking</span> contract logic on
-        Algorand. Staking amounts, pool totals and rewards are tracked in a
-        local demo ledger and can be wired to a live TestNet app without
-        changing this UI.
+        <span className="font-semibold">ProtiusStaking</span> contract economics.
+        When switched to TestNet mode, all calls route through the live
+        blockchain.
       </p>
 
       {/* Wallet status */}
@@ -159,7 +198,7 @@ const ProtiusStakingPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Staking economics */}
+      {/* Economics display */}
       <div className="rounded-md border border-emerald-500/20 bg-slate-950/60 px-3 py-2 space-y-1 text-[11px]">
         <div className="flex justify-between">
           <span className="text-emerald-200/80">Dev capital target:</span>
@@ -191,19 +230,66 @@ const ProtiusStakingPanel: React.FC = () => {
             {stakingState ? stakingState.userSharePct.toFixed(2) : "0.00"}%
           </span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-emerald-200/80">Projected reward at FC:</span>
-          <span className="font-mono text-emerald-100">
-            {stakingState ? formatBigInt(stakingState.projectedReward) : "0"}{" "}
-            USDC
-          </span>
+
+        {/* Payout projections */}
+        <div className="mt-2 pt-2 border-t border-emerald-500/20">
+          <div className="flex justify-between">
+            <span className="text-emerald-200/80">Cash payout at FC:</span>
+            <span className="font-mono text-emerald-100">
+              {stakingState
+                ? formatBigInt(stakingState.projectedCashPayout)
+                : "0"}{" "}
+              USDC
+            </span>
+          </div>
+
+          <div className="flex justify-between">
+            <span className="text-emerald-200/80">Equity credit:</span>
+            <span className="font-mono text-emerald-100">
+              {stakingState
+                ? formatBigInt(stakingState.projectedEquityCredit)
+                : "0"}{" "}
+              USDC
+            </span>
+          </div>
+        </div>
+
+        {/* Mode selector */}
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-emerald-200/80">Payout mode:</span>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleModeChange("cash")}
+              disabled={isBusy || !activeAddress}
+              className={`px-2 py-1 rounded-md text-[11px] ${
+                stakingState?.claimMode === "cash"
+                  ? "bg-emerald-500 text-slate-900 font-semibold"
+                  : "border border-emerald-500/40 text-emerald-200"
+              }`}
+            >
+              Cash
+            </button>
+            <button
+              onClick={() => handleModeChange("equity")}
+              disabled={isBusy || !activeAddress}
+              className={`px-2 py-1 rounded-md text-[11px] ${
+                stakingState?.claimMode === "equity"
+                  ? "bg-emerald-500 text-slate-900 font-semibold"
+                  : "border border-emerald-500/40 text-emerald-200"
+              }`}
+            >
+              Equity
+            </button>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={loadState}
           disabled={!activeAddress || isBusy}
-          className="mt-2 inline-flex items-center rounded-md border border-emerald-500/60 px-2 py-1 text-[11px] font-medium text-emerald-100 hover:bg-emerald-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="mt-3 inline-flex items-center rounded-md border border-emerald-500/60 px-2 py-1 text-[11px] font-medium text-emerald-100
+                     hover:bg-emerald-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isBusy ? "Refreshing…" : "Refresh state"}
         </button>
@@ -219,7 +305,8 @@ const ProtiusStakingPanel: React.FC = () => {
             step="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-full rounded-md border border-emerald-500/30 bg-slate-950/60 px-2 py-1 text-xs text-emerald-50 outline-none focus:border-emerald-400 focus:ring-0"
+            className="w-full rounded-md border border-emerald-500/30 bg-slate-950/60 px-2 py-1
+                       text-xs text-emerald-50 outline-none focus:border-emerald-400 focus:ring-0"
             placeholder="e.g. 10.0"
           />
         </label>
@@ -229,7 +316,8 @@ const ProtiusStakingPanel: React.FC = () => {
             type="button"
             onClick={handleStake}
             disabled={!activeAddress || isBusy}
-            className="flex-1 rounded-md bg-emerald-500/90 px-2 py-1 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 rounded-md bg-emerald-500/90 px-2 py-1 text-xs font-semibold text-slate-900
+                       hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isBusy ? "Broadcasting…" : "Stake"}
           </button>
@@ -237,7 +325,8 @@ const ProtiusStakingPanel: React.FC = () => {
             type="button"
             onClick={handleWithdraw}
             disabled={!activeAddress || isBusy}
-            className="flex-1 rounded-md border border-emerald-500/60 px-2 py-1 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 rounded-md border border-emerald-500/60 px-2 py-1 text-xs font-semibold text-emerald-100
+                       hover:bg-emerald-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isBusy ? "Broadcasting…" : "Withdraw"}
           </button>
@@ -254,14 +343,9 @@ const ProtiusStakingPanel: React.FC = () => {
       </div>
 
       <p className="text-[11px] text-emerald-200/70">
-        In demo mode, all values are stored in a local ledger to mimic the
-        on-chain behaviour of the ProtiusStaking contract. Once the contract is
-        deployed to Algorand TestNet, this panel can switch to live mode by
-        routing these calls through the generated{" "}
-        <code className="font-mono text-emerald-200">
-          ProtiusStakingClient
-        </code>{" "}
-        without changing the UI.
+        In demo mode, all values are stored in a local ledger. When the staking
+        contract is deployed on Algorand TestNet, this panel will connect to the
+        live blockchain without requiring UI changes.
       </p>
     </div>
   );
