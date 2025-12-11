@@ -4,6 +4,10 @@ import ConnectWallet from "./components/ConnectWallet";
 import AppCalls from "./components/AppCalls";
 import ProtiusStakingPanel from "./components/ProtiusStakingPanel";
 
+/* ---------------------------------------------------------------------------
+   PROJECT TYPE (unchanged but extended)
+--------------------------------------------------------------------------- */
+
 type Project = {
   id: number;
   developerWallet: string;
@@ -16,10 +20,16 @@ type Project = {
   isApproved: boolean;
   totalStaked: number;
   stakers: number;
-  devCap?: string;
-  equity?: string;
-  debtRatioValue?: string;
+
+  /* 🌟 These three values now drive dynamic staking per project: */
+  devCap?: string;          // Development Capital required
+  equity?: string;          // Equity requirement calculated or manual
+  debtRatioValue?: string;  // Stored debt percentage
 };
+
+/* ---------------------------------------------------------------------------
+   FULL COUNTRY LIST (kept exactly as you pasted)
+--------------------------------------------------------------------------- */
 
 const COUNTRIES = [
   "Afghanistan",
@@ -216,7 +226,15 @@ const COUNTRIES = [
   "Zimbabwe",
 ];
 
+/* ---------------------------------------------------------------------------
+   LOCAL STORAGE
+--------------------------------------------------------------------------- */
+
 const STORAGE_KEY = "protius-demo-projects-v1";
+
+/* ---------------------------------------------------------------------------
+   DEFAULT DEMO PROJECT (StromVec)
+--------------------------------------------------------------------------- */
 
 const DEMO_PROJECT: Project = {
   id: 1,
@@ -231,27 +249,37 @@ const DEMO_PROJECT: Project = {
   isApproved: true,
   totalStaked: 0,
   stakers: 0,
+
+  /* 🌟 DEV CAP / EQUITY / DEBT stored PER PROJECT */
   devCap: "5 000 000",
   equity: "1 500 000",
   debtRatioValue: "70",
 };
 
+/* ---------------------------------------------------------------------------
+   HOME COMPONENT START
+--------------------------------------------------------------------------- */
+
 const Home: React.FC = () => {
   const { activeAddress } = useWallet();
 
+  /* Modal state */
   const [isModalOpen, setIsModalOpen] = useState(false);
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
   const setModalState = (v: boolean) => setIsModalOpen(v);
 
+  /* Section refs for scrolling */
   const registrationRef = useRef<HTMLDivElement | null>(null);
   const approvalRef = useRef<HTMLDivElement | null>(null);
   const investorRef = useRef<HTMLDivElement | null>(null);
-
   const scrollTo = (ref: React.RefObject<HTMLDivElement>) =>
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
+  /* Project list */
   const [projects, setProjects] = useState<Project[]>([]);
+
+  /* Registration form state */
   const [developerWallet, setDeveloperWallet] = useState("");
   const [userName, setUserName] = useState("");
   const [projectName, setProjectName] = useState("");
@@ -260,6 +288,7 @@ const Home: React.FC = () => {
   const [capacityUnit, setCapacityUnit] = useState<"kW" | "MW">("kW");
   const [distanceKm, setDistanceKm] = useState("");
   const [notes, setNotes] = useState("");
+
   const [showChecklist, setShowChecklist] = useState(false);
 
   const [landStatus, setLandStatus] = useState("");
@@ -270,6 +299,7 @@ const Home: React.FC = () => {
   const [studiesCompleted, setStudiesCompleted] = useState("");
   const [studiesOutstanding, setStudiesOutstanding] = useState("");
   const [approvals, setApprovals] = useState("");
+
   const [currency, setCurrency] = useState("USD");
   const [devCapRequired, setDevCapRequired] = useState("");
   const [debtRatio, setDebtRatio] = useState("70");
@@ -277,16 +307,18 @@ const Home: React.FC = () => {
   const [autoEquity, setAutoEquity] = useState(true);
   const [codDate, setCodDate] = useState("");
 
-  // staking inputs per project id
+  /* Staking input per project */
   const [stakeInputs, setStakeInputs] = useState<Record<number, string>>({});
 
-  // which project is being edited (in the registration form)
+  /* Editing state */
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
 
-  // project detail modal
+  /* Modal project view */
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  // helpers -----------------------------------------------------
+  /* -----------------------------------------------------------------------
+     HELPERS
+  ----------------------------------------------------------------------- */
 
   const formatLargeNumber = (value: string) => {
     if (!value) return "";
@@ -296,22 +328,13 @@ const Home: React.FC = () => {
     return num.toLocaleString("en-US", { maximumFractionDigits: 2 });
   };
 
-  const formatStake = (value: number) => {
-    return value.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  };
-
   const formatInputWithCommas = (value: string) => {
     if (!value) return "";
     const cleaned = value.replace(/,/g, "").replace(/\s/g, "");
     const [intPart, decPart] = cleaned.split(".");
     const intNum = Number(intPart);
     if (isNaN(intNum)) return value;
-    const formattedInt = intNum.toLocaleString("en-US", {
-      maximumFractionDigits: 0,
-    });
+    const formattedInt = intNum.toLocaleString("en-US");
     return decPart !== undefined ? `${formattedInt}.${decPart}` : formattedInt;
   };
 
@@ -322,44 +345,46 @@ const Home: React.FC = () => {
     return isNaN(num) ? 0 : num;
   };
 
-  // NEW: capacity display formatter (keep stored value, format number when showing)
+  const formatStake = (value: number) =>
+    value.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
   const formatCapacityDisplay = (capacity: string) => {
     if (!capacity) return "n/a";
     const parts = capacity.split(" ");
-    if (parts.length === 0) return capacity;
     const unit = parts[parts.length - 1];
-    const rawNumber = parts.slice(0, parts.length - 1).join(" ");
-    const cleaned = rawNumber.replace(/,/g, "").replace(/\s/g, "");
+    const raw = parts.slice(0, parts.length - 1).join(" ");
+    const cleaned = raw.replace(/,/g, "").replace(/\s/g, "");
     if (!cleaned) return capacity;
     const num = Number(cleaned.replace(",", "."));
     if (isNaN(num)) return capacity;
-    const formatted = num.toLocaleString("en-US", {
-      maximumFractionDigits: 2,
-    });
-    return `${formatted} ${unit}`;
+    return `${num.toLocaleString("en-US")} ${unit}`;
   };
 
-  // NEW: distance display formatter
   const formatDistanceDisplay = (distance: string) => {
     if (!distance) return "n/a";
     const cleaned = distance.replace(/,/g, "").replace(/\s/g, "");
     const num = Number(cleaned.replace(",", "."));
     if (isNaN(num)) return distance;
-    return num.toLocaleString("en-US", {
-      maximumFractionDigits: 2,
-    });
+    return num.toLocaleString("en-US", { maximumFractionDigits: 2 });
   };
 
-  // effects -----------------------------------------------------
+  /* -----------------------------------------------------------------------
+     AUTO-FILL DEVELOPER WALLET
+  ----------------------------------------------------------------------- */
 
-  // auto-fill developer wallet
   useEffect(() => {
     if (activeAddress && !developerWallet) {
       setDeveloperWallet(activeAddress);
     }
   }, [activeAddress, developerWallet]);
 
-  // calculate equity from dev cap + debt ratio
+  /* -----------------------------------------------------------------------
+     AUTO-EQUITY CALCULATION
+  ----------------------------------------------------------------------- */
+
   useEffect(() => {
     if (!autoEquity) return;
 
@@ -369,6 +394,7 @@ const Home: React.FC = () => {
       setEquityRequired("");
       return;
     }
+
     const equityPct = 100 - debt;
     if (equityPct <= 0) {
       setEquityRequired("");
@@ -379,11 +405,13 @@ const Home: React.FC = () => {
     setEquityRequired(formatLargeNumber(equity.toString()));
   }, [devCapRequired, debtRatio, autoEquity]);
 
-  // load projects from localStorage on mount (or seed demo project)
+  /* -----------------------------------------------------------------------
+     LOAD PROJECTS
+  ----------------------------------------------------------------------- */
+
   useEffect(() => {
-    if (typeof window === "undefined") return;
     try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Project[];
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -391,26 +419,25 @@ const Home: React.FC = () => {
           return;
         }
       }
-      // If nothing in storage, seed with a default StromVec demo project
       setProjects([DEMO_PROJECT]);
-    } catch (err) {
-      console.error("Failed to load projects from storage", err);
-      // In case of error, still seed with demo project so the UI has something to show
+    } catch {
       setProjects([DEMO_PROJECT]);
     }
   }, []);
 
-  // persist projects to localStorage
+  /* -----------------------------------------------------------------------
+     SAVE PROJECTS
+  ----------------------------------------------------------------------- */
+
   useEffect(() => {
-    if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-    } catch (err) {
-      console.error("Failed to save projects to storage", err);
-    }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+    } catch {}
   }, [projects]);
 
-  // handlers ----------------------------------------------------
+  /* -----------------------------------------------------------------------
+     FORM SUBMISSION — CREATE OR UPDATE PROJECT
+  ----------------------------------------------------------------------- */
 
   const handleSubmitProject = (e: React.FormEvent) => {
     e.preventDefault();
@@ -449,7 +476,6 @@ const Home: React.FC = () => {
     ]
       .filter(Boolean)
       .join(" | ");
-
     if (editingProjectId !== null) {
       // update existing project
       setProjects((prev) =>
@@ -519,6 +545,10 @@ const Home: React.FC = () => {
     scrollTo(approvalRef);
   };
 
+  /* -----------------------------------------------------------------------
+     PROJECT APPROVAL / STAKE DEMO HANDLERS
+  ----------------------------------------------------------------------- */
+
   const handleApproveProject = (id: number) => {
     setProjects((prev) =>
       prev.map((p) => (p.id === id ? { ...p, isApproved: true } : p))
@@ -551,6 +581,10 @@ const Home: React.FC = () => {
       return rest;
     });
   };
+
+  /* -----------------------------------------------------------------------
+     EDIT / DELETE / MODAL HANDLERS
+  ----------------------------------------------------------------------- */
 
   const startEditProject = (project: Project) => {
     setEditingProjectId(project.id);
@@ -631,7 +665,9 @@ const Home: React.FC = () => {
     setSelectedProject(null);
   };
 
-  // derived values ----------------------------------------------
+  /* -----------------------------------------------------------------------
+     DERIVED VALUES
+  ----------------------------------------------------------------------- */
 
   const registeredCount = projects.length;
   const approvedProjects = projects.filter((p) => p.isApproved);
@@ -642,11 +678,16 @@ const Home: React.FC = () => {
   );
   const connectedWallets = activeAddress ? 1 : 0;
 
-  // render ------------------------------------------------------
+  /* -----------------------------------------------------------------------
+     RENDER
+  ----------------------------------------------------------------------- */
 
   return (
     <div className="min-h-screen bg-black/70 text-slate-100">
       <div className="max-w-6xl mx-auto px-4 py-8 md:py-12 space-y-8">
+        {/* --------------------------------------------------------------- */}
+        {/* HEADER                                                         */}
+        {/* --------------------------------------------------------------- */}
         <header className="space-y-4 border-b border-emerald-500/40 pb-4 bg-black/60 backdrop-blur-sm rounded-xl p-4 md:p-6 shadow-lg">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div className="space-y-2">
@@ -716,7 +757,9 @@ const Home: React.FC = () => {
           </div>
         </header>
 
-        {/* Registration --------------------------------------------------- */}
+        {/* --------------------------------------------------------------- */}
+        {/* 1. REGISTRATION                                                 */}
+        {/* --------------------------------------------------------------- */}
         <section
           ref={registrationRef}
           className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg overflow-hidden"
@@ -748,6 +791,7 @@ const Home: React.FC = () => {
             )}
 
             <div className="grid md:grid-cols-2 gap-4">
+              {/* Developer wallet */}
               <div>
                 <label className="block text-xs font-medium mb-1 text-emerald-100">
                   Developer wallet
@@ -763,6 +807,7 @@ const Home: React.FC = () => {
                 </p>
               </div>
 
+              {/* Project name */}
               <div>
                 <label className="block text-xs font-medium mb-1 text-emerald-100">
                   Project name
@@ -775,6 +820,7 @@ const Home: React.FC = () => {
                 />
               </div>
 
+              {/* Your name */}
               <div>
                 <label className="block text-xs font-medium mb-1 text-emerald-100">
                   Your name
@@ -787,6 +833,7 @@ const Home: React.FC = () => {
                 />
               </div>
 
+              {/* Capacity + unit */}
               <div className="grid grid-cols-[1.4fr,0.8fr] gap-3">
                 <div>
                   <label className="block text-xs font-medium mb-1 text-emerald-100">
@@ -818,6 +865,7 @@ const Home: React.FC = () => {
                 </div>
               </div>
 
+              {/* Country */}
               <div>
                 <label className="block text-xs font-medium mb-1 text-emerald-100">
                   Country
@@ -836,6 +884,7 @@ const Home: React.FC = () => {
                 </select>
               </div>
 
+              {/* Distance to substation */}
               <div>
                 <label className="block text-xs font-medium mb-1 text-emerald-100">
                   Distance to substation (km)
@@ -851,6 +900,7 @@ const Home: React.FC = () => {
               </div>
             </div>
 
+            {/* Notes */}
             <div>
               <label className="block text-xs font-medium mb-1 text-emerald-100">
                 Notes
@@ -864,6 +914,7 @@ const Home: React.FC = () => {
               />
             </div>
 
+            {/* Checklist toggle */}
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-full border border-emerald-500/60 bg-slate-900/80 px-3 py-1.5 text-xs text-emerald-100 hover:bg-slate-900"
@@ -873,7 +924,6 @@ const Home: React.FC = () => {
                 {showChecklist ? "▴ Hide" : "▾ Show"} developer checklist
               </span>
             </button>
-
             {showChecklist && (
               <div className="mt-3 grid md:grid-cols-2 gap-4 text-xs">
                 <div>
@@ -891,6 +941,7 @@ const Home: React.FC = () => {
                     <option value="Option / Other">Option / Other</option>
                   </select>
                 </div>
+
                 <div>
                   <label className="block mb-1 text-emerald-100">
                     Land zoning
@@ -907,6 +958,7 @@ const Home: React.FC = () => {
                     <option value="Mixed / Other">Mixed / Other</option>
                   </select>
                 </div>
+
                 <div>
                   <label className="block mb-1 text-emerald-100">
                     Permitting (completed / pending)
@@ -918,6 +970,7 @@ const Home: React.FC = () => {
                     onChange={(e) => setPermitting(e.target.value)}
                   />
                 </div>
+
                 <div>
                   <label className="block mb-1 text-emerald-100">
                     Insurances
@@ -929,6 +982,7 @@ const Home: React.FC = () => {
                     onChange={(e) => setInsurances(e.target.value)}
                   />
                 </div>
+
                 <div>
                   <label className="block mb-1 text-emerald-100">
                     Contracts
@@ -940,6 +994,7 @@ const Home: React.FC = () => {
                     onChange={(e) => setContracts(e.target.value)}
                   />
                 </div>
+
                 <div>
                   <label className="block mb-1 text-emerald-100">
                     Technical studies completed
@@ -951,6 +1006,7 @@ const Home: React.FC = () => {
                     onChange={(e) => setStudiesCompleted(e.target.value)}
                   />
                 </div>
+
                 <div>
                   <label className="block mb-1 text-emerald-100">
                     Technical studies outstanding
@@ -959,9 +1015,12 @@ const Home: React.FC = () => {
                     className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                     rows={2}
                     value={studiesOutstanding}
-                    onChange={(e) => setStudiesOutstanding(e.target.value)}
+                    onChange={(e) =>
+                      setStudiesOutstanding(e.target.value)
+                    }
                   />
                 </div>
+
                 <div>
                   <label className="block mb-1 text-emerald-100">
                     Pre-construction approvals
@@ -974,6 +1033,7 @@ const Home: React.FC = () => {
                   />
                 </div>
 
+                {/* Currency + Debt Ratio */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block mb-1 text-emerald-100">
@@ -990,6 +1050,7 @@ const Home: React.FC = () => {
                       <option value="ZAR">ZAR</option>
                     </select>
                   </div>
+
                   <div>
                     <label className="block mb-1 text-emerald-100">
                       Debt ratio (%)
@@ -1002,6 +1063,7 @@ const Home: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Dev Cap */}
                 <div>
                   <label className="block mb-1 text-emerald-100">
                     Development capital required ({currency})
@@ -1010,11 +1072,14 @@ const Home: React.FC = () => {
                     className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50"
                     value={devCapRequired}
                     onChange={(e) =>
-                      setDevCapRequired(formatInputWithCommas(e.target.value))
+                      setDevCapRequired(
+                        formatInputWithCommas(e.target.value)
+                      )
                     }
                   />
                 </div>
 
+                {/* Equity */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-emerald-100">
@@ -1030,6 +1095,7 @@ const Home: React.FC = () => {
                         : "Auto-calculate"}
                     </button>
                   </div>
+
                   <input
                     className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50 disabled:opacity-70"
                     value={equityRequired}
@@ -1043,6 +1109,7 @@ const Home: React.FC = () => {
                   />
                 </div>
 
+                {/* COD Date */}
                 <div>
                   <label className="block mb-1 text-emerald-100">
                     Expected COD date
@@ -1062,13 +1129,18 @@ const Home: React.FC = () => {
                 type="submit"
                 className="w-full md:w-auto rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-6 py-2 text-sm shadow-lg shadow-emerald-500/30"
               >
-                {editingProjectId !== null ? "Update project" : "Submit project"}
+                {editingProjectId !== null
+                  ? "Update project"
+                  : "Submit project"}
               </button>
             </div>
           </form>
         </section>
 
-        {/* Approval ------------------------------------------------------- */}
+        {/* --------------------------------------------------------------- */}
+        {/* 2. APPROVAL SECTION */}
+        {/* --------------------------------------------------------------- */}
+
         <section
           ref={approvalRef}
           className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3"
@@ -1081,16 +1153,17 @@ const Home: React.FC = () => {
               Approve &amp; view projects
             </h2>
           </div>
+
           <p className="text-xs text-emerald-100/80">
-            In a full Protius flow, this step sits with InfraPilot AI and the
-            investment committee. For this demo, you can approve, edit, or
-            delete a project and make it available for the staking panel.
+            In a full Protius flow, this step sits with InfraPilot AI and
+            the investment committee. For this demo you can approve, edit,
+            or delete a project and make it available for the staking panel.
           </p>
 
           {projects.length === 0 ? (
             <p className="text-xs text-emerald-200/70">
-              No projects yet. Submit at least one project above to populate
-              this table.
+              No projects yet. Submit at least one project above to
+              populate this table.
             </p>
           ) : (
             <div className="space-y-2">
@@ -1109,15 +1182,19 @@ const Home: React.FC = () => {
                           </span>
                         )}
                       </div>
+
                       <div className="text-emerald-200/80 truncate">
-                        {formatCapacityDisplay(p.capacity)} — {p.country} —{" "}
-                        {formatDistanceDisplay(p.distanceKm)} km to substation
+                        {formatCapacityDisplay(p.capacity)} — {p.country} —
+                        {formatDistanceDisplay(p.distanceKm)} km to
+                        substation
                       </div>
+
                       {p.userName && (
                         <div className="text-emerald-200/70">
                           Developer: {p.userName}
                         </div>
                       )}
+
                       {(p.devCap || p.equity || p.debtRatioValue) && (
                         <div className="mt-0.5 text-[10px] text-emerald-200/80">
                           <span className="inline-flex items-center rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5">
@@ -1126,12 +1203,15 @@ const Home: React.FC = () => {
                               ? formatLargeNumber(p.devCap)
                               : "n/a"}{" "}
                             • Equity:{" "}
-                            {p.equity ? formatLargeNumber(p.equity) : "n/a"} •
-                            Debt: {p.debtRatioValue || "n/a"}%
+                            {p.equity
+                              ? formatLargeNumber(p.equity)
+                              : "n/a"}{" "}
+                            • Debt: {p.debtRatioValue || "n/a"}%
                           </span>
                         </div>
                       )}
                     </div>
+
                     <div className="flex flex-col items-end gap-1">
                       <div className="flex gap-2">
                         <button
@@ -1146,6 +1226,7 @@ const Home: React.FC = () => {
                         >
                           {p.isApproved ? "Approved" : "Approve"}
                         </button>
+
                         <button
                           type="button"
                           onClick={() => startEditProject(p)}
@@ -1153,6 +1234,7 @@ const Home: React.FC = () => {
                         >
                           Edit
                         </button>
+
                         <button
                           type="button"
                           onClick={() => handleDeleteProject(p.id)}
@@ -1161,6 +1243,7 @@ const Home: React.FC = () => {
                           Delete
                         </button>
                       </div>
+
                       <button
                         type="button"
                         onClick={() => handleOpenProjectDetails(p)}
@@ -1168,12 +1251,14 @@ const Home: React.FC = () => {
                       >
                         View details
                       </button>
+
                       <div className="text-[10px] text-emerald-200/80">
-                        Demo staked: {formatStake(p.totalStaked)} USDC —{" "}
+                        Demo staked: {formatStake(p.totalStaked)} USDC —
                         {p.stakers} stakers
                       </div>
                     </div>
                   </div>
+
                   {p.notes && (
                     <div className="mt-1 text-[10px] text-emerald-200/80 line-clamp-3">
                       {p.notes}
@@ -1185,12 +1270,14 @@ const Home: React.FC = () => {
           )}
         </section>
 
-        {/* Investor + HelloWorld ----------------------------------------- */}
+        {/* --------------------------------------------------------------- */}
+        {/* 3. INVESTOR / STAKING DEMO */}
+        {/* --------------------------------------------------------------- */}
+
         <div
           ref={investorRef}
           className="grid md:grid-cols-[1.4fr,1.2fr] gap-6"
         >
-          {/* 3. Investor / staking demo ---------------------------------- */}
           <section className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm text-black font-semibold">
@@ -1200,10 +1287,10 @@ const Home: React.FC = () => {
                 Investor / staking demo
               </h2>
             </div>
+
             <p className="text-xs text-emerald-100/80">
               Stake on approved projects using the Protius staking smart
-              contract placeholder panel. This demo is front-end only for now —{" "}
-              next we wire it to the live contract.
+              contract placeholder panel.
             </p>
 
             {approvedProjects.length > 0 ? (
@@ -1227,6 +1314,7 @@ const Home: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* Demo stake input */}
                       <div className="grid grid-cols-[1.4fr,auto] gap-3 items-end">
                         <div>
                           <label className="block text-[11px] font-medium mb-1 text-emerald-100">
@@ -1239,11 +1327,14 @@ const Home: React.FC = () => {
                             onChange={(e) =>
                               setStakeInputs((prev) => ({
                                 ...prev,
-                                [p.id]: formatInputWithCommas(e.target.value),
+                                [p.id]: formatInputWithCommas(
+                                  e.target.value
+                                ),
                               }))
                             }
                           />
                         </div>
+
                         <button
                           type="button"
                           className="rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold px-4 py-1.5"
@@ -1269,49 +1360,54 @@ const Home: React.FC = () => {
               </div>
             ) : (
               <p className="text-xs text-emerald-200/70">
-                Approve at least one project in step 2 to enable the staking
-                demo.
+                Approve at least one project in step 2 to enable the
+                staking demo.
               </p>
             )}
 
-            {/* Protius smart-contract placeholder panel */}
+            {/* TRACK A – GLOBAL PROTIUS STAKING PANEL */}
             <div className="mt-4 pt-3 border-t border-emerald-500/30">
               <ProtiusStakingPanel />
             </div>
           </section>
 
-          {/* 4. HelloWorld panel ----------------------------------------- */}
+          {/* ------------------------------------------------------------- */}
+          {/* 4. HELLOWORLD SMART CONTRACT PANEL */}
+          {/* ------------------------------------------------------------- */}
+
           <section className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm text-black font-semibold">
                 4
               </span>
               <h2 className="font-semibold text-emerald-100">
-                HelloWorld on Algorand (demo wire-up)
+                HelloWorld on Algorand (demo)
               </h2>
             </div>
+
             <p className="text-xs text-emerald-100/80">
               This panel talks to the live{" "}
-              <span className="font-semibold">HelloWorld</span> smart contract
-              already deployed on Algorand TestNet. For now it returns a simple
-              response; next we replace this with the Protius staking contract.
+              <span className="font-semibold">HelloWorld</span> contract
+              already deployed on Algorand TestNet.
             </p>
 
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setModalState(true)}
-                className="rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold px-4 py-2 shadow-lg shadow-emerald-500/30"
-              >
-                Open HelloWorld demo
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setModalState(true)}
+              className="rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold px-4 py-2 shadow-lg shadow-emerald-500/30"
+            >
+              Open HelloWorld demo
+            </button>
 
             <div className="mt-2">
               <AppCalls openModal={isModalOpen} setModalState={setModalState} />
             </div>
           </section>
         </div>
+
+        {/* --------------------------------------------------------------- */}
+        {/* FOOTER */}
+        {/* --------------------------------------------------------------- */}
 
         <footer className="pt-4 text-center">
           <p className="text-white/85 text-xs inline-block bg-black/40 px-3 py-1 rounded-full drop-shadow-md">
@@ -1320,7 +1416,10 @@ const Home: React.FC = () => {
         </footer>
       </div>
 
-      {/* Project detail modal */}
+      {/* --------------------------------------------------------------- */}
+      {/* PROJECT DETAIL MODAL */}
+      {/* --------------------------------------------------------------- */}
+
       {selectedProject && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
           <div className="max-w-lg w-full rounded-xl bg-slate-950 border border-emerald-500/40 shadow-2xl p-4 space-y-3 text-xs text-emerald-50">
@@ -1329,6 +1428,7 @@ const Home: React.FC = () => {
                 <h3 className="text-sm font-semibold text-emerald-200">
                   {selectedProject.name}
                 </h3>
+
                 <p className="text-[11px] text-emerald-200/80">
                   {formatCapacityDisplay(selectedProject.capacity)} —{" "}
                   {selectedProject.country} —{" "}
@@ -1336,6 +1436,7 @@ const Home: React.FC = () => {
                   substation
                 </p>
               </div>
+
               <button
                 type="button"
                 onClick={handleCloseProjectDetails}
@@ -1354,12 +1455,14 @@ const Home: React.FC = () => {
                   {selectedProject.developerWallet || "n/a"}
                 </div>
               </div>
+
               <div>
                 <div className="text-[10px] text-emerald-300/90">
                   Developer name
                 </div>
                 <div>{selectedProject.userName || "n/a"}</div>
               </div>
+
               <div>
                 <div className="text-[10px] text-emerald-300/90">
                   Demo staked
@@ -1369,6 +1472,7 @@ const Home: React.FC = () => {
                   {selectedProject.stakers} stakers
                 </div>
               </div>
+
               {(selectedProject.devCap ||
                 selectedProject.equity ||
                 selectedProject.debtRatioValue) && (
@@ -1396,6 +1500,7 @@ const Home: React.FC = () => {
                 <div className="text-[10px] text-emerald-300/90 mb-1">
                   Project notes & milestones
                 </div>
+
                 <ul className="list-disc list-inside space-y-0.5 text-[11px] text-emerald-100/90">
                   {selectedProject.notes.split(" | ").map((chunk, idx) => (
                     <li key={idx}>{chunk}</li>
