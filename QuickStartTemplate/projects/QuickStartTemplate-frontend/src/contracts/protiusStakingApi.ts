@@ -1,18 +1,20 @@
 /**
  * Track A Demo Ledger for Protius Staking
  * ----------------------------------------
- * - Per-investor staking
- * - Per-investor payout mode (“cash” or “equity”)
- * - devCap = 1,000,000
- * - rewardPool = 1,000,000 (1:1 premium)
- * - Cash return = stake
- * - Equity credit = stake (premium)
- * - Cash-only mode = 2× payout, no equity
+ * - 3 payout modes:
+ *    • cash   → 2× payout in cash
+ *    • hybrid → 1× cash + 1× equity
+ *    • equity → 2× equity
+ *
+ * - devCap = 1,000,000  (fixed for Track A)
+ * - rewardPool = 1,000,000 (fixed 1:1 premium)
+ *
+ * - All values stored locally in demo ledger
  */
 
 export const isDemoMode = () => true;
 
-export type ClaimMode = "cash" | "equity";
+export type ClaimMode = "cash" | "hybrid" | "equity";
 
 export type StakingState = {
   devCap: bigint;
@@ -20,8 +22,10 @@ export type StakingState = {
   totalStake: bigint;
   userStake: bigint;
   userSharePct: number;
+
   projectedCashPayout: bigint;
   projectedEquityCredit: bigint;
+
   claimMode: ClaimMode;
 };
 
@@ -32,7 +36,7 @@ type InternalLedger = {
   claimMode: Record<string, ClaimMode>;
 };
 
-const LS_KEY = "protius_demo_ledger_v2";
+const LS_KEY = "protius_demo_ledger_v3";
 
 /* -------------------------------
    Ledger helpers
@@ -46,7 +50,7 @@ function loadLedger(): InternalLedger {
     devCap: 1_000_000,
     rewardPool: 1_000_000,
     stakes: {},
-    claimMode: {}, // per-wallet payout preference
+    claimMode: {}, // per-wallet payout mode
   };
   saveLedger(initial);
   return initial;
@@ -57,7 +61,7 @@ function saveLedger(ledger: InternalLedger) {
 }
 
 /* -------------------------------
-   Core computation
+   Core computation logic
 ------------------------------- */
 
 function computeState(addr: string, ledger: InternalLedger): StakingState {
@@ -65,36 +69,54 @@ function computeState(addr: string, ledger: InternalLedger): StakingState {
   const totalStake = Object.values(ledger.stakes).reduce((a, b) => a + b, 0);
 
   const share = totalStake > 0 ? (userStake / totalStake) * 100 : 0;
+
   const mode: ClaimMode = ledger.claimMode[addr] ?? "cash";
 
   let projectedCash = 0;
   let projectedEquity = 0;
 
-  if (mode === "cash") {
-    projectedCash = userStake * 2; // full 2× payout
-    projectedEquity = 0;
-  } else {
-    projectedCash = userStake;     // capital only
-    projectedEquity = userStake;   // premium becomes equity
+  switch (mode) {
+    case "cash":
+      // 2× payout entirely in cash
+      projectedCash = userStake * 2;
+      projectedEquity = 0;
+      break;
+
+    case "hybrid":
+      // 1× capital returned in cash + 1× premium in equity
+      projectedCash = userStake;
+      projectedEquity = userStake;
+      break;
+
+    case "equity":
+      // 2× stake converted fully to equity
+      projectedCash = 0;
+      projectedEquity = userStake * 2;
+      break;
   }
 
   return {
     devCap: BigInt(ledger.devCap),
     rewardPool: BigInt(ledger.rewardPool),
+
     totalStake: BigInt(totalStake),
     userStake: BigInt(userStake),
     userSharePct: share,
+
     projectedCashPayout: BigInt(projectedCash),
     projectedEquityCredit: BigInt(projectedEquity),
+
     claimMode: mode,
   };
 }
 
 /* -------------------------------
-   Public API
+   Public API exposed to UI
 ------------------------------- */
 
-export async function fetchStakingState(address: string): Promise<StakingState> {
+export async function fetchStakingState(
+  address: string
+): Promise<StakingState> {
   const ledger = loadLedger();
   return computeState(address, ledger);
 }
