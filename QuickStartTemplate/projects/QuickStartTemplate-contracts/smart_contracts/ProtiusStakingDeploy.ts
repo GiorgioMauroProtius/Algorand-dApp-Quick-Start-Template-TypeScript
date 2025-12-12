@@ -1,13 +1,12 @@
 import { AlgorandClient } from '@algorandfoundation/algokit-utils';
-import { getAlgodConfigFromViteEnvironment } from '../../QuickStartTemplate-frontend/src/config';
 import { ProtiusStakingFactory } from './ProtiusStaking.contract';
 
 async function main() {
   console.log("🚀 Deploying ProtiusStaking contract to TestNet...");
 
-  // 1. Load Algod connection using the same config as the frontend
-  const algodConfig = getAlgodConfigFromViteEnvironment(false);
-  const algorand = AlgorandClient.fromConfig({ algodConfig });
+  // 1. Load Algod connection from environment (same network used by contracts dev tools)
+const algorand = AlgorandClient.fromEnvironment();
+
 
   // 2. Use the active wallet (the one you already use for HelloWorld)
   const sender = await algorand.account.fromEnvironment(); 

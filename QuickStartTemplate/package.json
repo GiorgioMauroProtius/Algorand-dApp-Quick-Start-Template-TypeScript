@@ -7,5 +7,9 @@
     "setup": "npm run deps:needed && npm run bootstrap",
     "dev": "npx -y concurrently -k -n FRONTEND,SERVER 'cd projects/QuickStartTemplate-frontend && npm run dev' 'cd projects/QuickStartTemplate-contracts && node nft_mint_server/server.js'",
     "deploy:protius-staking": "ts-node projects/QuickStartTemplate-contracts/smart_contracts/ProtiusStakingDeploy.ts"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }
