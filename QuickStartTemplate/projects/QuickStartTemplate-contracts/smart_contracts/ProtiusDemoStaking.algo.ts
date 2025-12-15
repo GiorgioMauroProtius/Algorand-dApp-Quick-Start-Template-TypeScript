@@ -8,7 +8,7 @@ import {
   emit,
   Bytes,
   Uint64,
-  Global, // ✅ REQUIRED for latestTimestamp
+  Global,
 } from "@algorandfoundation/tealscript";
 
 /**
@@ -80,7 +80,10 @@ export class ProtiusDemoStaking extends Contract {
         : assert(false);
 
     assert(axfer.xferAsset === this.usdcAssetId.value, "Wrong asset");
-    assert(axfer.assetReceiver === this.appAddress, "Wrong receiver");
+    assert(
+      axfer.assetReceiver === Global.currentApplicationAddress,
+      "Wrong receiver"
+    );
     assert(axfer.sender === Txn.sender, "Sender mismatch");
 
     const newTotal =
@@ -167,4 +170,3 @@ export class ProtiusDemoStaking extends Contract {
     emit(Bytes("STAKING_CLOSED"));
   }
 }
-
