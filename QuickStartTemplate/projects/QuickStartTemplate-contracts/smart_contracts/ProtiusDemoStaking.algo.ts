@@ -31,10 +31,10 @@ export class ProtiusDemoStaking extends Contract {
   /* ========= GLOBAL STATE ========= */
 
   usdcAssetId = GlobalState<Uint64>();
-  stakingOpen = GlobalState<Uint64>();          // 1 = open, 0 = closed
-  maturityReached = GlobalState<Uint64>();      // 1 = matured
+  stakingOpen = GlobalState<Uint64>(); // 1 = open, 0 = closed
+  maturityReached = GlobalState<Uint64>(); // 1 = matured
   targetReturnMultiple = GlobalState<Uint64>(); // e.g. 200 = 2.0x
-  withdrawalLockSeconds = GlobalState<Uint64>(); // seconds
+  withdrawalLockSeconds = GlobalState<Uint64>(); // e.g. 172800 (48h)
 
   /* ========= LOCAL STATE ========= */
 
@@ -54,7 +54,7 @@ export class ProtiusDemoStaking extends Contract {
     this.stakingOpen.value = 1;
     this.maturityReached.value = 0;
     this.targetReturnMultiple.value = 200; // 2.0x
-    this.withdrawalLockSeconds.value = 172_800; // 48h
+    this.withdrawalLockSeconds.value = 172800; // 48h
 
     emit(Bytes("PROTIUS_INIT"), usdcAssetId);
   }
@@ -107,7 +107,7 @@ export class ProtiusDemoStaking extends Contract {
     const amount = this.depositedAmount.value;
     assert(amount > 0, "Nothing to withdraw");
 
-    // NOTE: penalty is declared but not enforced in demo
+    // NOTE: penalty is DECLARED only (demo)
     this.depositedAmount.value = 0;
 
     emit(
