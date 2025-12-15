@@ -1034,9 +1034,7 @@ const Home: React.FC = () => {
                     className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-2 py-1.5 text-emerald-50 disabled:opacity-70"
                     value={equityRequired}
                     onChange={(e) => {
-                      setEquityRequired(
-                        formatInputWithCommas(e.target.value)
-                      );
+                      setEquityRequired(formatInputWithCommas(e.target.value));
                       setAutoEquity(false);
                     }}
                     disabled={autoEquity}
@@ -1122,10 +1120,8 @@ const Home: React.FC = () => {
                         <div className="mt-0.5 text-[10px] text-emerald-200/80">
                           <span className="inline-flex items-center rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5">
                             Dev cap:{" "}
-                            {p.devCap
-                              ? formatLargeNumber(p.devCap)
-                              : "n/a"}{" "}
-                            • Equity:{" "}
+                            {p.devCap ? formatLargeNumber(p.devCap) : "n/a"} •
+                            Equity:{" "}
                             {p.equity ? formatLargeNumber(p.equity) : "n/a"} •
                             Debt: {p.debtRatioValue || "n/a"}%
                           </span>
@@ -1259,8 +1255,7 @@ const Home: React.FC = () => {
                         <span className="font-semibold">
                           {formatStake(p.totalStaked)} USDC
                         </span>{" "}
-                        —{" "}
-                        <span className="font-semibold">{p.stakers}</span>{" "}
+                        — <span className="font-semibold">{p.stakers}</span>{" "}
                         stakers
                       </div>
                     </div>
@@ -1361,9 +1356,7 @@ const Home: React.FC = () => {
                 <div>{selectedProject.userName || "n/a"}</div>
               </div>
               <div>
-                <div className="text-[10px] text-emerald-300/90">
-                  Demo staked
-                </div>
+                <div className="text-[10px] text-emerald-300/90">Demo staked</div>
                 <div>
                   {formatStake(selectedProject.totalStaked)} USDC —{" "}
                   {selectedProject.stakers} stakers
@@ -1403,6 +1396,20 @@ const Home: React.FC = () => {
                 </ul>
               </div>
             )}
+
+            {/* 🔽 Track B ADDITION START */}
+            <div className="pt-3 border-t border-emerald-500/30">
+              <div className="font-semibold text-emerald-200 text-xs">
+                Track B — Project-level staking (preview)
+              </div>
+              <p className="text-[10px] text-emerald-200/80 mb-2">
+                This panel previews how staking mechanics apply when scoped to a
+                single project. Capital participation and outcomes are evaluated
+                per project rather than across the platform.
+              </p>
+              <ProtiusStakingPanel />
+            </div>
+            {/* 🔼 Track B ADDITION END */}
           </div>
         </div>
       )}
