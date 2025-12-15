@@ -9,7 +9,7 @@ import {
   Bytes,
   Uint64,
   Global,
-} from "@algorandfoundation/algokit-utils/types/tealscript";
+} from "@algorandfoundation/tealscript";
 
 /**
  * ============================
