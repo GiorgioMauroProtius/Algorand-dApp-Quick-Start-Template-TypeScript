@@ -31,12 +31,12 @@ export class ProtiusDemoStaking extends Contract {
   /* ========= GLOBAL STATE ========= */
 
   usdcAssetId = GlobalState<Uint64>();
-  stakingOpen = GlobalState<Uint64>(); // 1 = open, 0 = closed
-  maturityReached = GlobalState<Uint64>(); // 1 = matured
+  stakingOpen = GlobalState<Uint64>();          // 1 = open, 0 = closed
+  maturityReached = GlobalState<Uint64>();      // 1 = matured
   targetReturnMultiple = GlobalState<Uint64>(); // e.g. 200 = 2.0x
-  withdrawalLockSeconds = GlobalState<Uint64>(); // e.g. 172800 (48h)
+  withdrawalLockSeconds = GlobalState<Uint64>(); // seconds
 
-  /* ========= LOCAL STATE (per staker) ========= */
+  /* ========= LOCAL STATE ========= */
 
   depositedAmount = LocalState<Uint64>();
   depositTimestamp = LocalState<Uint64>();
@@ -53,8 +53,8 @@ export class ProtiusDemoStaking extends Contract {
     this.usdcAssetId.value = usdcAssetId;
     this.stakingOpen.value = 1;
     this.maturityReached.value = 0;
-    this.targetReturnMultiple.value = 200; // 2.0x (indicative)
-    this.withdrawalLockSeconds.value = 172800; // 48h
+    this.targetReturnMultiple.value = 200; // 2.0x
+    this.withdrawalLockSeconds.value = 172_800; // 48h
 
     emit(Bytes("PROTIUS_INIT"), usdcAssetId);
   }
@@ -86,44 +86,28 @@ export class ProtiusDemoStaking extends Contract {
     );
     assert(axfer.sender === Txn.sender, "Sender mismatch");
 
-    const newTotal =
-      this.depositedAmount.value + axfer.assetAmount;
+    const newTotal = this.depositedAmount.value + axfer.assetAmount;
 
-    assert(
-      newTotal <= ProtiusDemoStaking.MAX_STAKE,
-      "Max stake exceeded"
-    );
+    assert(newTotal <= ProtiusDemoStaking.MAX_STAKE, "Max stake exceeded");
 
     this.depositedAmount.value = newTotal;
     this.depositTimestamp.value = Global.latestTimestamp;
 
-    emit(
-      Bytes("STAKE_DEPOSITED"),
-      Txn.sender,
-      axfer.assetAmount,
-      newTotal
-    );
+    emit(Bytes("STAKE_DEPOSITED"), Txn.sender, axfer.assetAmount, newTotal);
   }
 
   /* ========= WITHDRAW ========= */
 
   withdraw(): void {
     const lockedUntil =
-      this.depositTimestamp.value +
-      this.withdrawalLockSeconds.value;
+      this.depositTimestamp.value + this.withdrawalLockSeconds.value;
 
-    assert(
-      Global.latestTimestamp >= lockedUntil,
-      "Withdrawal locked"
-    );
+    assert(Global.latestTimestamp >= lockedUntil, "Withdrawal locked");
 
     const amount = this.depositedAmount.value;
     assert(amount > 0, "Nothing to withdraw");
 
-    // DEMO NOTE:
-    // Early exit penalty of 2.5% is DECLARED but not enforced.
-    // Liquidity pool logic will apply this in production.
-
+    // NOTE: penalty is declared but not enforced in demo
     this.depositedAmount.value = 0;
 
     emit(
@@ -141,13 +125,10 @@ export class ProtiusDemoStaking extends Contract {
 
     this.maturityReached.value = 1;
 
-    emit(
-      Bytes("PROJECT_MATURED"),
-      this.targetReturnMultiple.value
-    );
+    emit(Bytes("PROJECT_MATURED"), this.targetReturnMultiple.value);
   }
 
-  /* ========= CONVERSION OPTION ========= */
+  /* ========= CONVERSION ========= */
 
   optIntoConversion(): void {
     assert(this.maturityReached.value === 1, "Not matured");
