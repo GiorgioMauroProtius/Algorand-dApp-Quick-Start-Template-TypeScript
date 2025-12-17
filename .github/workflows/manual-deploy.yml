@@ -1,0 +1,66 @@
+name: Manual Deploy (LocalNet)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Manual deploy to LocalNet
+    runs-on: ubuntu-latest
+    env:
+      # ensure pipx-installed binaries are available
+      PATH: ${{ env.PATH }}:$HOME/.local/bin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install pipx and algokit
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --user pipx
+          python -m pipx ensurepath || true
+          python -m pipx install algokit
+
+      - name: Start AlgoKit LocalNet
+        run: |
+          ~/.local/bin/algokit localnet start
+
+      - name: Wait for LocalNet to be healthy
+        run: |
+          echo "Waiting for Algod to respond on http://localhost:4001/v2/status"
+          for i in $(seq 1 60); do
+            if curl -sS http://localhost:4001/v2/status >/dev/null 2>&1; then
+              echo "LocalNet is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Timed out waiting for LocalNet"
+          exit 1
+
+      - name: Install contracts npm deps
+        run: |
+          cd QuickStartTemplate/projects/QuickStartTemplate-contracts
+          npm ci
+
+      - name: Bootstrap project (generate clients)
+        run: |
+          cd QuickStartTemplate
+          ALGOKIT_NO_INTERACTIVE=1 ALGOKIT_NO_SPINNER=1 ~/.local/bin/algokit project bootstrap all || true
+
+      - name: Run deploy runner
+        run: |
+          cd QuickStartTemplate/projects/QuickStartTemplate-contracts
+          npm run deploy:runner
+
+      - name: Upload deployment result
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-result
+          path: QuickStartTemplate/projects/QuickStartTemplate-contracts/deploy-result.json

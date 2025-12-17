@@ -2,8 +2,13 @@
 min_version = "v2.0.0"
 
 [project]
-type = 'workspace'
-projects_root_path = 'projects'
+type = "workspace"
+projects_root_path = "projects"
 
 [project.run]
-build = ['QuickStartTemplate-contracts', 'QuickStartTemplate-frontend']
+build = ["QuickStartTemplate-contracts", "QuickStartTemplate-frontend"]
+
+# 🔴 CRITICAL: disable npm-based deploy recursion
+[deploy]
+use_npm = false
+
