@@ -86,12 +86,24 @@ export function setTransactionSigner(
   signer: algosdk.TransactionSigner | null,
   address: string | null
 ): void {
+  // Defensive check: validate address format if provided
+  if (address && !algosdk.isValidAddress(address)) {
+    console.error('[ProtiusStaking] Invalid address format provided:', address)
+    throw new Error(`Invalid Algorand address format: ${address}`)
+  }
+  
   transactionSigner = signer
   userAddress = address
   console.log('[ProtiusStaking] Transaction signer updated:', {
     hasSigner: !!signer,
-    address: address || 'none'
+    address: address || 'none',
+    timestamp: new Date().toISOString()
   })
+  
+  // Additional logging for debugging
+  if (signer && !address) {
+    console.warn('[ProtiusStaking] Signer set without address - transactions may require explicit address parameter')
+  }
 }
 
 // ============================================================================
@@ -233,10 +245,19 @@ async function isUserOptedIn(appId: number, address: string): Promise<boolean> {
  * @returns Current staking state with total stake and user stake
  */
 export async function fetchStakingState(address?: string): Promise<StakingState> {
-  console.log('[ProtiusStaking] Fetching staking state...')
+  console.log('[ProtiusStaking] Fetching staking state...', {
+    providedAddress: address || 'none',
+    cachedAddress: userAddress || 'none',
+    timestamp: new Date().toISOString()
+  })
   
   const appId = getAppId()
   const addr = address || userAddress
+  
+  // Validate address if provided
+  if (addr && !algosdk.isValidAddress(addr)) {
+    throw new Error(`Invalid Algorand address format: ${addr}`)
+  }
   
   // Read global state (always available)
   const totalStake = await readGlobalState(appId)
@@ -245,6 +266,8 @@ export async function fetchStakingState(address?: string): Promise<StakingState>
   let userStake = BigInt(0)
   if (addr) {
     userStake = await readLocalState(appId, addr)
+  } else {
+    console.log('[ProtiusStaking] No address provided, userStake will be 0')
   }
   
   const state: StakingState = {
@@ -254,7 +277,9 @@ export async function fetchStakingState(address?: string): Promise<StakingState>
   
   console.log('[ProtiusStaking] Staking state fetched:', {
     totalStake: state.totalStake.toString(),
-    userStake: state.userStake.toString()
+    userStake: state.userStake.toString(),
+    totalStakeAlgo: (Number(state.totalStake) / 1_000_000).toFixed(6),
+    userStakeAlgo: (Number(state.userStake) / 1_000_000).toFixed(6)
   })
   
   return state
@@ -361,23 +386,53 @@ async function optInToApplication(appId: number, address: string): Promise<void>
  * @param address - Optional user address. If not provided, uses cached address
  */
 export async function stake(amount: bigint, address?: string): Promise<void> {
+  // Phase 2: Enhanced validation and logging
+  console.log('[ProtiusStaking] === STAKE OPERATION START ===', {
+    amount: amount.toString(),
+    amountAlgo: (Number(amount) / 1_000_000).toFixed(6),
+    providedAddress: address || 'none',
+    cachedAddress: userAddress || 'none',
+    timestamp: new Date().toISOString()
+  })
+  
   if (!transactionSigner) {
-    throw new Error('Transaction signer not set. Please connect your wallet first.')
+    const error = 'Transaction signer not set. Please connect your wallet first.'
+    console.error('[ProtiusStaking]', error)
+    throw new Error(error)
   }
   
   const addr = address || userAddress
   if (!addr) {
-    throw new Error('No wallet address available. Please connect your wallet.')
+    const error = 'No wallet address available. Please connect your wallet.'
+    console.error('[ProtiusStaking]', error)
+    throw new Error(error)
+  }
+  
+  // Validate address format
+  if (!algosdk.isValidAddress(addr)) {
+    const error = `Invalid Algorand address format: ${addr}`
+    console.error('[ProtiusStaking]', error)
+    throw new Error(error)
+  }
+  
+  // Validate amount
+  if (amount <= BigInt(0)) {
+    const error = `Invalid stake amount: ${amount}. Amount must be positive.`
+    console.error('[ProtiusStaking]', error)
+    throw new Error(error)
   }
   
   const appId = getAppId()
-  console.log('[ProtiusStaking] Staking', amount.toString(), 'microAlgos...')
+  console.log('[ProtiusStaking] Using App ID:', appId, 'for address:', addr)
   
   // Check if user is opted in, opt in if needed
   const optedIn = await isUserOptedIn(appId, addr)
+  console.log('[ProtiusStaking] User opt-in status:', optedIn)
+  
   if (!optedIn) {
     console.log('[ProtiusStaking] User not opted in, performing automatic opt-in...')
     await optInToApplication(appId, addr)
+    console.log('[ProtiusStaking] Opt-in completed successfully')
   }
   
   const client = getAlgodClient()
@@ -415,19 +470,29 @@ export async function stake(amount: bigint, address?: string): Promise<void> {
   // Group transactions
   const txnGroup = [paymentTxn, appCallTxn]
   algosdk.assignGroupID(txnGroup)
-  console.log('[ProtiusStaking] Created atomic transaction group with', txnGroup.length, 'transactions')
+  console.log('[ProtiusStaking] Created atomic transaction group:', {
+    transactionCount: txnGroup.length,
+    groupId: Buffer.from(txnGroup[0].group!).toString('base64')
+  })
   
   // Sign the transaction group
+  console.log('[ProtiusStaking] Signing transaction group...')
   const signedTxns = await transactionSigner(txnGroup, [0, 1])
+  console.log('[ProtiusStaking] Transaction group signed successfully')
   
   // Send the transaction group
   const response = await client.sendRawTransaction(signedTxns).do()
   const txId = response.txid
-  console.log('[ProtiusStaking] Stake transaction group sent:', txId)
+  console.log('[ProtiusStaking] Stake transaction group sent. TxID:', txId)
   
   // Wait for confirmation
+  console.log('[ProtiusStaking] Waiting for confirmation...')
   await waitForConfirmation(client, txId)
-  console.log('[ProtiusStaking] Stake transaction confirmed')
+  console.log('[ProtiusStaking] === STAKE OPERATION COMPLETE ===', {
+    txId,
+    amount: amount.toString(),
+    address: addr
+  })
 }
 
 // ============================================================================
@@ -441,13 +506,90 @@ export async function stake(amount: bigint, address?: string): Promise<void> {
  * @param address - Optional user address. If not provided, uses cached address
  */
 export async function withdraw(amount: bigint, address?: string): Promise<void> {
+  // Phase 2: Enhanced validation and logging
+  console.log('[ProtiusStaking] === WITHDRAW OPERATION START ===', {
+    amount: amount.toString(),
+    amountAlgo: (Number(amount) / 1_000_000).toFixed(6),
+    providedAddress: address || 'none',
+    cachedAddress: userAddress || 'none',
+    timestamp: new Date().toISOString()
+  })
+  
   if (!transactionSigner) {
-    throw new Error('Transaction signer not set. Please connect your wallet first.')
+    const error = 'Transaction signer not set. Please connect your wallet first.'
+    console.error('[ProtiusStaking]', error)
+    throw new Error(error)
   }
   
   const addr = address || userAddress
   if (!addr) {
-    throw new Error('No wallet address available. Please connect your wallet.')
+    const error = 'No wallet address available. Please connect your wallet.'
+    console.error('[ProtiusStaking]', error)
+    throw new Error(error)
+  }
+  
+  // Validate address format
+  if (!algosdk.isValidAddress(addr)) {
+    const error = `Invalid Algorand address format: ${addr}`
+    console.error('[ProtiusStaking]', error)
+    throw new Error(error)
+  }
+  
+  // Validate amount
+  if (amount <= BigInt(0)) {
+    const error = `Invalid withdrawal amount: ${amount}. Amount must be positive.`
+    console.error('[ProtiusStaking]', error)
+    throw new Error(error)
+  }
+  
+  const appId = getAppId()
+  console.log('[ProtiusStaking] Using App ID:', appId, 'for address:', addr)
+  
+  const client = getAlgodClient()
+  const params = await getSuggestedParams()
+  
+  // Validate amount is within safe range for Number conversion
+  if (amount > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(
+      `Withdraw amount ${amount} exceeds maximum safe integer value. ` +
+      `Maximum supported amount is ${Number.MAX_SAFE_INTEGER} microAlgos.`
+    )
+  }
+  
+  // Create application call transaction with "withdraw" method
+  const withdrawMethodArg = new TextEncoder().encode('withdraw')
+  const amountArg = algosdk.encodeUint64(Number(amount))
+  
+  console.log('[ProtiusStaking] Creating withdraw transaction with encoded amount')
+  
+  const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
+    sender: addr,
+    appIndex: appId,
+    appArgs: [withdrawMethodArg, amountArg],
+    suggestedParams: params
+  })
+  
+  console.log('[ProtiusStaking] Withdraw transaction created')
+  
+  // Sign the transaction
+  console.log('[ProtiusStaking] Signing transaction...')
+  const signedTxns = await transactionSigner([appCallTxn], [0])
+  console.log('[ProtiusStaking] Transaction signed successfully')
+  
+  // Send the transaction
+  const response = await client.sendRawTransaction(signedTxns).do()
+  const txId = response.txid
+  console.log('[ProtiusStaking] Withdraw transaction sent. TxID:', txId)
+  
+  // Wait for confirmation
+  console.log('[ProtiusStaking] Waiting for confirmation...')
+  await waitForConfirmation(client, txId)
+  console.log('[ProtiusStaking] === WITHDRAW OPERATION COMPLETE ===', {
+    txId,
+    amount: amount.toString(),
+    address: addr
+  })
+}
   }
   
   const appId = getAppId()
