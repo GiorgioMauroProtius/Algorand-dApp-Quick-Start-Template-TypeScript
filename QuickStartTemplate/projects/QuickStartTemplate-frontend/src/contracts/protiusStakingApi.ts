@@ -2,7 +2,7 @@
  * Protius Staking API - Real Algorand TestNet Implementation
  * 
  * This module provides functions to interact with the Protius Staking smart contract
- * on Algorand TestNet using algosdk v3 and @txnlab/use-wallet-react.
+ * on Algorand TestNet using algosdk v3.
  */
 
 import algosdk from 'algosdk'
@@ -77,9 +77,9 @@ function getAppId(): number {
 
 /**
  * Set the transaction signer from the wallet
- * This should be called by the component using the useStakingApi hook
+ * This should be called by the external UI to inject the wallet's transaction signer
  * 
- * @param signer - Transaction signer from @txnlab/use-wallet-react
+ * @param signer - Transaction signer from the wallet provider
  * @param address - Active wallet address
  */
 export function setTransactionSigner(
@@ -92,32 +92,6 @@ export function setTransactionSigner(
     hasSigner: !!signer,
     address: address || 'none'
   })
-}
-
-/**
- * React hook to initialize the staking API with wallet connection
- * 
- * Components should use the wallet's transactionSigner and call setTransactionSigner:
- * 
- * ```tsx
- * import { useWallet } from '@txnlab/use-wallet-react'
- * import { setTransactionSigner } from './contracts/protiusStakingApi'
- * 
- * function MyComponent() {
- *   const { transactionSigner, activeAddress } = useWallet()
- *   
- *   useEffect(() => {
- *     setTransactionSigner(transactionSigner, activeAddress)
- *   }, [transactionSigner, activeAddress])
- *   
- *   // ... rest of component
- * }
- * ```
- */
-export function useStakingApi(): void {
-  // This hook is exported for documentation purposes
-  // Components should use the pattern shown above
-  console.log('[ProtiusStaking] useStakingApi hook called - see documentation for usage')
 }
 
 // ============================================================================
