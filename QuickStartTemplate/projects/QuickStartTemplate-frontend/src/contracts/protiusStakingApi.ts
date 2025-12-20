@@ -590,44 +590,4 @@ export async function withdraw(amount: bigint, address?: string): Promise<void> 
     address: addr
   })
 }
-  }
-  
-  const appId = getAppId()
-  console.log('[ProtiusStaking] Withdrawing', amount.toString(), 'microAlgos...')
-  
-  const client = getAlgodClient()
-  const params = await getSuggestedParams()
-  
-  // Validate amount is within safe range for Number conversion
-  if (amount > BigInt(Number.MAX_SAFE_INTEGER)) {
-    throw new Error(
-      `Withdraw amount ${amount} exceeds maximum safe integer value. ` +
-      `Maximum supported amount is ${Number.MAX_SAFE_INTEGER} microAlgos.`
-    )
-  }
-  
-  // Create application call transaction with "withdraw" method
-  const withdrawMethodArg = new TextEncoder().encode('withdraw')
-  const amountArg = algosdk.encodeUint64(Number(amount))
-  
-  const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
-    sender: addr,
-    appIndex: appId,
-    appArgs: [withdrawMethodArg, amountArg],
-    suggestedParams: params
-  })
-  
-  console.log('[ProtiusStaking] Created withdraw transaction')
-  
-  // Sign the transaction
-  const signedTxns = await transactionSigner([appCallTxn], [0])
-  
-  // Send the transaction
-  const response = await client.sendRawTransaction(signedTxns).do()
-  const txId = response.txid
-  console.log('[ProtiusStaking] Withdraw transaction sent:', txId)
-  
-  // Wait for confirmation
-  await waitForConfirmation(client, txId)
-  console.log('[ProtiusStaking] Withdraw transaction confirmed')
-}
+
