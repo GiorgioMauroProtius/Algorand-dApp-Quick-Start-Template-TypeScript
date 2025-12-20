@@ -96,21 +96,28 @@ export function setTransactionSigner(
 
 /**
  * React hook to initialize the staking API with wallet connection
- * Usage in component:
+ * 
+ * Components should use the wallet's transactionSigner and call setTransactionSigner:
  * 
  * ```tsx
- * import { useStakingApi } from './contracts/protiusStakingApi'
+ * import { useWallet } from '@txnlab/use-wallet-react'
+ * import { setTransactionSigner } from './contracts/protiusStakingApi'
  * 
  * function MyComponent() {
- *   useStakingApi() // Initialize the API with wallet connection
+ *   const { transactionSigner, activeAddress } = useWallet()
+ *   
+ *   useEffect(() => {
+ *     setTransactionSigner(transactionSigner, activeAddress)
+ *   }, [transactionSigner, activeAddress])
+ *   
  *   // ... rest of component
  * }
  * ```
  */
 export function useStakingApi(): void {
-  // This will be implemented by components that need wallet integration
-  // For now, components should import useWallet and call setTransactionSigner manually
-  console.log('[ProtiusStaking] useStakingApi hook called')
+  // This hook is exported for documentation purposes
+  // Components should use the pattern shown above
+  console.log('[ProtiusStaking] useStakingApi hook called - see documentation for usage')
 }
 
 // ============================================================================
@@ -402,6 +409,14 @@ export async function stake(amount: bigint, address?: string): Promise<void> {
   const client = getAlgodClient()
   const params = await getSuggestedParams()
   
+  // Validate amount is within safe range for Number conversion
+  if (amount > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(
+      `Stake amount ${amount} exceeds maximum safe integer value. ` +
+      `Maximum supported amount is ${Number.MAX_SAFE_INTEGER} microAlgos.`
+    )
+  }
+  
   // Get application address
   const appAddress = algosdk.getApplicationAddress(appId)
   console.log('[ProtiusStaking] Application address:', appAddress)
@@ -466,6 +481,14 @@ export async function withdraw(amount: bigint, address?: string): Promise<void> 
   
   const client = getAlgodClient()
   const params = await getSuggestedParams()
+  
+  // Validate amount is within safe range for Number conversion
+  if (amount > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(
+      `Withdraw amount ${amount} exceeds maximum safe integer value. ` +
+      `Maximum supported amount is ${Number.MAX_SAFE_INTEGER} microAlgos.`
+    )
+  }
   
   // Create application call transaction with "withdraw" method
   const withdrawMethodArg = new TextEncoder().encode('withdraw')
