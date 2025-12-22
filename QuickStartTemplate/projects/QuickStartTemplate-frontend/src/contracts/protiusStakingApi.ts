@@ -1,7 +1,5 @@
-// QuickStartTemplate/projects/QuickStartTemplate-frontend/src/contracts/protiusStakingApi.ts
-
 import algosdk from "algosdk";
-import { getAlgodClient, getTransactionSigner } from "./walletService";
+import { getAlgodClient, getTransactionSigner } from "../walletService";
 
 // MUST match your deployed app
 const PROTIUS_STAKING_APP_ID = Number(
@@ -75,7 +73,7 @@ export async function optIn(accountAddress: string): Promise<void> {
   const params = await algod.getTransactionParams().do();
 
   const txn = algosdk.makeApplicationOptInTxnFromObject({
-    from: accountAddress,
+    sender: accountAddress,
     appIndex: PROTIUS_STAKING_APP_ID,
     suggestedParams: params,
   });
@@ -101,14 +99,14 @@ export async function stake(
   const params = await algod.getTransactionParams().do();
 
   const payTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-    from: accountAddress,
-    to: algosdk.getApplicationAddress(PROTIUS_STAKING_APP_ID),
+    sender: accountAddress,
+    receiver: algosdk.getApplicationAddress(PROTIUS_STAKING_APP_ID),
     amount: Number(amount),
     suggestedParams: params,
   });
 
   const appCallTxn = algosdk.makeApplicationCallTxnFromObject({
-    from: accountAddress,
+    sender: accountAddress,
     appIndex: PROTIUS_STAKING_APP_ID,
     onComplete: algosdk.OnApplicationComplete.NoOpOC,
     appArgs: [new Uint8Array(Buffer.from("stake"))],
@@ -138,7 +136,7 @@ export async function withdraw(
   const params = await algod.getTransactionParams().do();
 
   const appCallTxn = algosdk.makeApplicationCallTxnFromObject({
-    from: accountAddress,
+    sender: accountAddress,
     appIndex: PROTIUS_STAKING_APP_ID,
     onComplete: algosdk.OnApplicationComplete.NoOpOC,
     appArgs: [
