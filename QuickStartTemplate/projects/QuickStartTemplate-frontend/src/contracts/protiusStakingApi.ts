@@ -22,7 +22,7 @@ export async function fetchStakingState(
   const algod = getAlgodClient();
 
   try {
-    // Local (user) state → proves opt-in + stake
+    // ---- Local (user) state ----
     const acctInfo = await algod
       .accountApplicationInformation(accountAddress, PROTIUS_STAKING_APP_ID)
       .do();
@@ -38,7 +38,7 @@ export async function fetchStakingState(
       }
     }
 
-    // Global state → total pool
+    // ---- Global state ----
     const appInfo = await algod
       .getApplicationByID(PROTIUS_STAKING_APP_ID)
       .do();
@@ -56,7 +56,7 @@ export async function fetchStakingState(
 
     return { totalStake, userStake };
   } catch (err: any) {
-    // Not opted in yet
+    // User not opted in yet
     if (err?.status === 404) {
       return { totalStake: 0n, userStake: 0n };
     }
@@ -66,34 +66,17 @@ export async function fetchStakingState(
 
 /**
  * ============================
- * OPTION B – SIMPLIFIED OPT-IN
+ * TRACK-C DEMO TXs (NO-OP)
  * ============================
- * (Handled in UI later via useWallet)
  */
 export async function optIn(): Promise<void> {
-  console.warn(
-    "[optIn] Signing handled at UI layer (Track-C demo mode)"
-  );
+  console.warn("[optIn] Track-C demo mode – no-op");
 }
 
-/**
- * ============================
- * STAKE (placeholder)
- * ============================
- */
 export async function stake(): Promise<void> {
-  console.warn(
-    "[stake] Signing handled at UI layer (Track-C demo mode)"
-  );
+  console.warn("[stake] Track-C demo mode – no-op");
 }
 
-/**
- * ============================
- * WITHDRAW (placeholder)
- * ============================
- */
 export async function withdraw(): Promise<void> {
-  console.warn(
-    "[withdraw] Signing handled at UI layer (Track-C demo mode)"
-  );
+  console.warn("[withdraw] Track-C demo mode – no-op");
 }

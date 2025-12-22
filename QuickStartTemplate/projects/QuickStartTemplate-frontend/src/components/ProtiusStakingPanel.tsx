@@ -16,7 +16,10 @@ const ProtiusStakingPanel: React.FC = () => {
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const isOptedIn = Boolean(stakingState);
+  // Track-C logic:
+  // If we can read local state → user is opted in
+  const isOptedIn =
+    stakingState !== null && stakingState.userStake !== undefined;
 
   useEffect(() => {
     if (isReady && activeAddress) {
@@ -41,43 +44,31 @@ const ProtiusStakingPanel: React.FC = () => {
     }
   };
 
-  const parseAmountToMicroAlgos = (): bigint | null => {
-    if (!amount) return null;
-    const n = Number(amount);
-    if (Number.isNaN(n) || n <= 0) return null;
-    return BigInt(Math.round(n * 1_000_000));
-  };
-
   const handleOptIn = async () => {
-    if (!activeAddress) {
-      setMessage("Connect wallet first.");
-      return;
-    }
-
     try {
       setIsBusy(true);
       setMessage(null);
-      await optIn(activeAddress);
+      await optIn(); // Track-C no-op
       await loadState();
-      setMessage("Staking initialized successfully.");
+      setMessage(
+        "Staking initialized (demo mode). On-chain opt-in required once."
+      );
     } catch (err) {
       console.error("[ProtiusStakingPanel] Opt-in failed", err);
-      setMessage("Opt-in failed. Please try again.");
+      setMessage("Opt-in failed.");
     } finally {
       setIsBusy(false);
     }
   };
 
   const handleStake = async () => {
-    if (!activeAddress) return setMessage("Connect wallet first.");
-    const microAmount = parseAmountToMicroAlgos();
-    if (!microAmount) return setMessage("Invalid amount.");
-
     try {
       setIsBusy(true);
-      await stakeApi(activeAddress, microAmount);
-      await loadState();
-      setMessage("Stake submitted.");
+      setMessage(null);
+      await stakeApi(); // Track-C no-op
+      setMessage(
+        "Stake action submitted (demo). On-chain stake reflected once executed."
+      );
     } catch (err) {
       console.error(err);
       setMessage("Stake failed.");
@@ -87,15 +78,13 @@ const ProtiusStakingPanel: React.FC = () => {
   };
 
   const handleWithdraw = async () => {
-    if (!activeAddress) return setMessage("Connect wallet first.");
-    const microAmount = parseAmountToMicroAlgos();
-    if (!microAmount) return setMessage("Invalid amount.");
-
     try {
       setIsBusy(true);
-      await withdrawApi(activeAddress, microAmount);
-      await loadState();
-      setMessage("Withdraw submitted.");
+      setMessage(null);
+      await withdrawApi(); // Track-C no-op
+      setMessage(
+        "Withdraw action submitted (demo). On-chain withdraw reflected once executed."
+      );
     } catch (err) {
       console.error(err);
       setMessage("Withdraw failed.");
@@ -107,14 +96,24 @@ const ProtiusStakingPanel: React.FC = () => {
   return (
     <div className="rounded-lg border border-emerald-500/40 bg-slate-900/80 p-4 space-y-3 text-sm text-emerald-50">
       <p className="text-xs text-emerald-100/85">
-        Protius staking panel (Algorand TestNet).
+        Protius staking panel (Algorand TestNet — Track-C demo).
       </p>
 
       <div className="text-xs space-y-1">
         <div>Wallet: {activeAddress ?? "not connected"}</div>
         <div>
-          Your stake:{" "}
-          {stakingState ? Number(stakingState.userStake) / 1_000_000 : 0} ALGO
+          Your stake (on-chain):{" "}
+          {stakingState
+            ? Number(stakingState.userStake) / 1_000_000
+            : 0}{" "}
+          ALGO
+        </div>
+        <div>
+          Total pool (on-chain):{" "}
+          {stakingState
+            ? Number(stakingState.totalStake) / 1_000_000
+            : 0}{" "}
+          ALGO
         </div>
       </div>
 
@@ -125,7 +124,7 @@ const ProtiusStakingPanel: React.FC = () => {
           disabled={!activeAddress || isBusy}
           className="w-full rounded-md bg-amber-400 px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-amber-300 disabled:opacity-40"
         >
-          Initialize staking (one-time)
+          Initialize staking (demo)
         </button>
       )}
 
@@ -135,8 +134,8 @@ const ProtiusStakingPanel: React.FC = () => {
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         className="w-full rounded-md px-2 py-1 text-black"
-        placeholder="Amount in ALGO"
-        disabled={!isOptedIn}
+        placeholder="Amount in ALGO (demo input)"
+        disabled
       />
 
       <div className="flex gap-2">
