@@ -1,5 +1,5 @@
 import algosdk from "algosdk";
-import { getAlgodClient, getTransactionSigner } from "../../walletService";
+import { getAlgodClient, getTransactionSigner } from "../services/walletService";
 
 // MUST match your deployed app
 const PROTIUS_STAKING_APP_ID = Number(
