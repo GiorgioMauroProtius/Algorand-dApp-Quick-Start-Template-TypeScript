@@ -27,12 +27,13 @@ export async function fetchStakingState(
       .accountApplicationInformation(accountAddress, PROTIUS_STAKING_APP_ID)
       .do();
 
-    const localState = acctInfo.appLocalState?.keyValue ?? [];
+    const localState =
+      acctInfo.appLocalState?.keyValue ?? [];
 
     let userStake = 0n;
 
     for (const kv of localState) {
-      const key = Buffer.from(kv.key, "base64").toString("utf8");
+      const key = Buffer.from(kv.key).toString("utf8");
       if (key === "stake" && kv.value?.uint !== undefined) {
         userStake = BigInt(kv.value.uint);
       }
@@ -43,12 +44,13 @@ export async function fetchStakingState(
       .getApplicationByID(PROTIUS_STAKING_APP_ID)
       .do();
 
-    const globalState = appInfo.params.globalState ?? [];
+    const globalState =
+      appInfo.params.globalState ?? [];
 
     let totalStake = 0n;
 
     for (const kv of globalState) {
-      const key = Buffer.from(kv.key, "base64").toString("utf8");
+      const key = Buffer.from(kv.key).toString("utf8");
       if (key === "total_stake" && kv.value?.uint !== undefined) {
         totalStake = BigInt(kv.value.uint);
       }
@@ -69,9 +71,8 @@ export async function fetchStakingState(
  * TRACK-C DEMO TXs (NO-OP)
  * ============================
  * Reads are REAL
- * Writes are UI-only placeholders
+ * Writes are UI placeholders
  */
-
 export async function optIn(): Promise<void> {
   console.warn("[optIn] Track-C demo mode – no-op");
 }
