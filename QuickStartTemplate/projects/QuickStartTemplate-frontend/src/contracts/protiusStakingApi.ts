@@ -1,5 +1,5 @@
 import algosdk from "algosdk";
-import { getAlgodClient, getTransactionSigner } from "../walletService";
+import { getAlgodClient } from "../utils/algodClient";
 
 // MUST match your deployed app
 const PROTIUS_STAKING_APP_ID = Number(
@@ -13,7 +13,7 @@ export type StakingState = {
 
 /**
  * ============================
- * READ STATE
+ * READ STATE (REAL ON-CHAIN)
  * ============================
  */
 export async function fetchStakingState(
@@ -22,6 +22,7 @@ export async function fetchStakingState(
   const algod = getAlgodClient();
 
   try {
+    // Local (user) state → proves opt-in + stake
     const acctInfo = await algod
       .accountApplicationInformation(accountAddress, PROTIUS_STAKING_APP_ID)
       .do();
@@ -37,11 +38,13 @@ export async function fetchStakingState(
       }
     }
 
+    // Global state → total pool
     const appInfo = await algod
       .getApplicationByID(PROTIUS_STAKING_APP_ID)
       .do();
 
     const globalState = appInfo.params["global-state"] ?? [];
+
     let totalStake = 0n;
 
     for (const kv of globalState) {
@@ -53,7 +56,7 @@ export async function fetchStakingState(
 
     return { totalStake, userStake };
   } catch (err: any) {
-    // Not opted in yet → return zeroes
+    // Not opted in yet
     if (err?.status === 404) {
       return { totalStake: 0n, userStake: 0n };
     }
@@ -63,91 +66,34 @@ export async function fetchStakingState(
 
 /**
  * ============================
- * MANUAL OPT-IN (OPTION B)
+ * OPTION B – SIMPLIFIED OPT-IN
  * ============================
+ * (Handled in UI later via useWallet)
  */
-export async function optIn(accountAddress: string): Promise<void> {
-  const algod = getAlgodClient();
-  const signer = getTransactionSigner();
-
-  const params = await algod.getTransactionParams().do();
-
-  const txn = algosdk.makeApplicationOptInTxnFromObject({
-    sender: accountAddress,
-    appIndex: PROTIUS_STAKING_APP_ID,
-    suggestedParams: params,
-  });
-
-  const signed = await signer([txn], [0]);
-  const { txId } = await algod.sendRawTransaction(signed).do();
-
-  await algosdk.waitForConfirmation(algod, txId, 4);
+export async function optIn(): Promise<void> {
+  console.warn(
+    "[optIn] Signing handled at UI layer (Track-C demo mode)"
+  );
 }
 
 /**
  * ============================
- * STAKE
+ * STAKE (placeholder)
  * ============================
  */
-export async function stake(
-  accountAddress: string,
-  amount: bigint
-): Promise<void> {
-  const algod = getAlgodClient();
-  const signer = getTransactionSigner();
-
-  const params = await algod.getTransactionParams().do();
-
-  const payTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-    sender: accountAddress,
-    receiver: algosdk.getApplicationAddress(PROTIUS_STAKING_APP_ID),
-    amount: Number(amount),
-    suggestedParams: params,
-  });
-
-  const appCallTxn = algosdk.makeApplicationCallTxnFromObject({
-    sender: accountAddress,
-    appIndex: PROTIUS_STAKING_APP_ID,
-    onComplete: algosdk.OnApplicationComplete.NoOpOC,
-    appArgs: [new Uint8Array(Buffer.from("stake"))],
-    suggestedParams: params,
-  });
-
-  algosdk.assignGroupID([payTxn, appCallTxn]);
-
-  const signed = await signer([payTxn, appCallTxn], [0, 1]);
-  const { txId } = await algod.sendRawTransaction(signed).do();
-
-  await algosdk.waitForConfirmation(algod, txId, 4);
+export async function stake(): Promise<void> {
+  console.warn(
+    "[stake] Signing handled at UI layer (Track-C demo mode)"
+  );
 }
 
 /**
  * ============================
- * WITHDRAW
+ * WITHDRAW (placeholder)
  * ============================
  */
-export async function withdraw(
-  accountAddress: string,
-  amount: bigint
-): Promise<void> {
-  const algod = getAlgodClient();
-  const signer = getTransactionSigner();
-
-  const params = await algod.getTransactionParams().do();
-
-  const appCallTxn = algosdk.makeApplicationCallTxnFromObject({
-    sender: accountAddress,
-    appIndex: PROTIUS_STAKING_APP_ID,
-    onComplete: algosdk.OnApplicationComplete.NoOpOC,
-    appArgs: [
-      new Uint8Array(Buffer.from("withdraw")),
-      algosdk.encodeUint64(Number(amount)),
-    ],
-    suggestedParams: params,
-  });
-
-  const signed = await signer([appCallTxn], [0]);
-  const { txId } = await algod.sendRawTransaction(signed).do();
-
-  await algosdk.waitForConfirmation(algod, txId, 4);
+export async function withdraw(): Promise<void> {
+  console.warn(
+    "[withdraw] Signing handled at UI layer (Track-C demo mode)"
+  );
 }
