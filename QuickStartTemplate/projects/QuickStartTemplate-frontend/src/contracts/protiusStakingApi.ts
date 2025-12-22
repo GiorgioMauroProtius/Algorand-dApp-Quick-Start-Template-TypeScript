@@ -1,74 +1,155 @@
 // QuickStartTemplate/projects/QuickStartTemplate-frontend/src/contracts/protiusStakingApi.ts
 
-/**
- * Front-end API wrapper for the Protius staking contract.
- *
- * IMPORTANT:
- * - This file is written by us and is safe to edit.
- * - The auto-generated ProtiusStaking.ts client MUST NOT be edited.
- *
- * For now, these functions are stubs: they just log to the console.
- * Once we have the deployed app ID and are ready to wire in Algorand,
- * we'll import the generated ProtiusStaking client here and replace the
- * console.log() calls with real on-chain interactions.
- */
+import algosdk from "algosdk";
+import { getAlgodClient, getTransactionSigner } from "./walletService";
+
+// MUST match your deployed app
+const PROTIUS_STAKING_APP_ID = Number(
+  import.meta.env.VITE_PROTIUS_STAKING_APP_ID ?? "0"
+);
 
 export type StakingState = {
-  totalStake: bigint; // total pool stake (microAlgos)
-  userStake: bigint;  // stake for the connected user (microAlgos)
+  totalStake: bigint; // microAlgos
+  userStake: bigint;  // microAlgos
 };
 
 /**
- * Fetch current staking state for a given account.
- * Currently returns zeros as a placeholder.
+ * ============================
+ * READ STATE
+ * ============================
  */
 export async function fetchStakingState(
   accountAddress: string
 ): Promise<StakingState> {
-  console.log(
-    "[protiusStakingApi] TODO: fetch state from chain for",
-    accountAddress
-  );
+  const algod = getAlgodClient();
 
-  // Placeholder: no on-chain calls yet
-  return {
-    totalStake: 0n,
-    userStake: 0n,
-  };
+  try {
+    const acctInfo = await algod
+      .accountApplicationInformation(accountAddress, PROTIUS_STAKING_APP_ID)
+      .do();
+
+    const localState = acctInfo["app-local-state"]?.["key-value"] ?? [];
+
+    let userStake = 0n;
+
+    for (const kv of localState) {
+      const key = Buffer.from(kv.key, "base64").toString();
+      if (key === "stake") {
+        userStake = BigInt(kv.value.uint);
+      }
+    }
+
+    const appInfo = await algod
+      .getApplicationByID(PROTIUS_STAKING_APP_ID)
+      .do();
+
+    const globalState = appInfo.params["global-state"] ?? [];
+    let totalStake = 0n;
+
+    for (const kv of globalState) {
+      const key = Buffer.from(kv.key, "base64").toString();
+      if (key === "total_stake") {
+        totalStake = BigInt(kv.value.uint);
+      }
+    }
+
+    return { totalStake, userStake };
+  } catch (err: any) {
+    // Not opted in yet → return zeroes
+    if (err?.status === 404) {
+      return { totalStake: 0n, userStake: 0n };
+    }
+    throw err;
+  }
 }
 
 /**
- * Stake a given amount (in microAlgos) for the given account.
- * Currently just logs to the console.
+ * ============================
+ * MANUAL OPT-IN (OPTION B)
+ * ============================
+ */
+export async function optIn(accountAddress: string): Promise<void> {
+  const algod = getAlgodClient();
+  const signer = getTransactionSigner();
+
+  const params = await algod.getTransactionParams().do();
+
+  const txn = algosdk.makeApplicationOptInTxnFromObject({
+    from: accountAddress,
+    appIndex: PROTIUS_STAKING_APP_ID,
+    suggestedParams: params,
+  });
+
+  const signed = await signer([txn], [0]);
+  const { txId } = await algod.sendRawTransaction(signed).do();
+
+  await algosdk.waitForConfirmation(algod, txId, 4);
+}
+
+/**
+ * ============================
+ * STAKE
+ * ============================
  */
 export async function stake(
   accountAddress: string,
   amount: bigint
 ): Promise<void> {
-  console.log(
-    "[protiusStakingApi] TODO: stake on-chain",
-    amount.toString(),
-    "microAlgos for",
-    accountAddress
-  );
+  const algod = getAlgodClient();
+  const signer = getTransactionSigner();
 
-  // Placeholder: real Algorand transaction will be added later.
+  const params = await algod.getTransactionParams().do();
+
+  const payTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+    from: accountAddress,
+    to: algosdk.getApplicationAddress(PROTIUS_STAKING_APP_ID),
+    amount: Number(amount),
+    suggestedParams: params,
+  });
+
+  const appCallTxn = algosdk.makeApplicationCallTxnFromObject({
+    from: accountAddress,
+    appIndex: PROTIUS_STAKING_APP_ID,
+    onComplete: algosdk.OnApplicationComplete.NoOpOC,
+    appArgs: [new Uint8Array(Buffer.from("stake"))],
+    suggestedParams: params,
+  });
+
+  algosdk.assignGroupID([payTxn, appCallTxn]);
+
+  const signed = await signer([payTxn, appCallTxn], [0, 1]);
+  const { txId } = await algod.sendRawTransaction(signed).do();
+
+  await algosdk.waitForConfirmation(algod, txId, 4);
 }
 
 /**
- * Withdraw a given amount (in microAlgos) for the given account.
- * Currently just logs to the console.
+ * ============================
+ * WITHDRAW
+ * ============================
  */
 export async function withdraw(
   accountAddress: string,
   amount: bigint
 ): Promise<void> {
-  console.log(
-    "[protiusStakingApi] TODO: withdraw on-chain",
-    amount.toString(),
-    "microAlgos for",
-    accountAddress
-  );
+  const algod = getAlgodClient();
+  const signer = getTransactionSigner();
 
-  // Placeholder: real Algorand transaction will be added later.
+  const params = await algod.getTransactionParams().do();
+
+  const appCallTxn = algosdk.makeApplicationCallTxnFromObject({
+    from: accountAddress,
+    appIndex: PROTIUS_STAKING_APP_ID,
+    onComplete: algosdk.OnApplicationComplete.NoOpOC,
+    appArgs: [
+      new Uint8Array(Buffer.from("withdraw")),
+      algosdk.encodeUint64(Number(amount)),
+    ],
+    suggestedParams: params,
+  });
+
+  const signed = await signer([appCallTxn], [0]);
+  const { txId } = await algod.sendRawTransaction(signed).do();
+
+  await algosdk.waitForConfirmation(algod, txId, 4);
 }
