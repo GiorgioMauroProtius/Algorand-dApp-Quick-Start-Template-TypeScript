@@ -8,14 +8,12 @@ const PROTIUS_STAKING_APP_ID = Number(
 );
 
 export type StakingState = {
-  totalStake: bigint; // microAlgos
-  userStake: bigint;  // microAlgos
+  totalStake: bigint;
+  userStake: bigint;
 };
 
 /**
- * ============================
  * READ STATE (REAL ON-CHAIN)
- * ============================
  */
 export async function fetchStakingState(
   accountAddress: string
@@ -23,12 +21,12 @@ export async function fetchStakingState(
   const algod = getAlgodClient();
 
   try {
-    // ---- Local (user) state ----
+    // Local (user) state
     const acctInfo = await algod
       .accountApplicationInformation(accountAddress, PROTIUS_STAKING_APP_ID)
       .do();
 
-    const localState = acctInfo.appLocalState?.keyValue ?? [];
+    const localState = acctInfo["app-local-state"]?.["key-value"] ?? [];
     let userStake = 0n;
 
     for (const kv of localState) {
@@ -38,12 +36,9 @@ export async function fetchStakingState(
       }
     }
 
-    // ---- Global state ----
-    const appInfo = await algod
-      .getApplicationByID(PROTIUS_STAKING_APP_ID)
-      .do();
-
-    const globalState = appInfo.params.globalState ?? [];
+    // Global state
+    const appInfo = await algod.getApplicationByID(PROTIUS_STAKING_APP_ID).do();
+    const globalState = appInfo.params["global-state"] ?? [];
     let totalStake = 0n;
 
     for (const kv of globalState) {
@@ -55,7 +50,6 @@ export async function fetchStakingState(
 
     return { totalStake, userStake };
   } catch (err: any) {
-    // User not opted in yet
     if (err?.status === 404) {
       return { totalStake: 0n, userStake: 0n };
     }
@@ -64,42 +58,38 @@ export async function fetchStakingState(
 }
 
 /**
- * ============================
  * REAL ON-CHAIN TRANSACTIONS
- * ============================
  */
 
-/**
- * Opt-in to the staking app (one-time)
- */
 export async function optIn(
   activeAddress: string,
-  signer: algosdk.TransactionSigner
+  transactionSigner: (txnGroup: algosdk.Transaction[], indexesToSign: number[]) => Promise<Uint8Array[]>
 ): Promise<void> {
   if (PROTIUS_STAKING_APP_ID === 0) {
     throw new Error("VITE_PROTIUS_STAKING_APP_ID not configured");
   }
 
   const algod = getAlgodClient();
-  const client = new ProtiusStakingClient(
-    {
-      sender: activeAddress,
-      resolveBy: "id",
-      id: PROTIUS_STAKING_APP_ID,
-    },
-    algod
-  );
+  const suggestedParams = await algod.getTransactionParams().do();
 
-  const result = await client.optIn.optInToApplication({}, { sendParams: { signer } });
-  console.log("[optIn] Transaction ID:", result.txIds[0]);
+  // Create opt-in transaction
+  const optInTxn = algosdk.makeApplicationOptInTxnFromObject({
+    from: activeAddress,
+    appIndex: PROTIUS_STAKING_APP_ID,
+    suggestedParams,
+  });
+
+  // Sign and send
+  const signedTxns = await transactionSigner([optInTxn], [0]);
+  const { txId } = await algod.sendRawTransaction(signedTxns).do();
+  await algosdk.waitForConfirmation(algod, txId, 4);
+  
+  console.log("[optIn] Transaction ID:", txId);
 }
 
-/**
- * Stake ALGO into the contract
- */
 export async function stake(
   activeAddress: string,
-  signer: algosdk.TransactionSigner,
+  transactionSigner: (txnGroup: algosdk.Transaction[], indexesToSign: number[]) => Promise<Uint8Array[]>,
   amountInAlgo: number
 ): Promise<void> {
   if (PROTIUS_STAKING_APP_ID === 0) {
@@ -107,19 +97,10 @@ export async function stake(
   }
 
   const algod = getAlgodClient();
-  const client = new ProtiusStakingClient(
-    {
-      sender: activeAddress,
-      resolveBy: "id",
-      id: PROTIUS_STAKING_APP_ID,
-    },
-    algod
-  );
-
+  const suggestedParams = await algod.getTransactionParams().do();
   const amountMicroAlgos = BigInt(Math.floor(amountInAlgo * 1_000_000));
 
-  // Create payment transaction to contract
-  const suggestedParams = await algod.getTransactionParams().do();
+  // Payment to contract
   const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
     from: activeAddress,
     to: algosdk.getApplicationAddress(PROTIUS_STAKING_APP_ID),
@@ -127,21 +108,28 @@ export async function stake(
     suggestedParams,
   });
 
-  // Call stake method
-  const result = await client.stake(
-    { payment: paymentTxn },
-    { sendParams: { signer } }
-  );
+  // App call to stake method
+  const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
+    from: activeAddress,
+    appIndex: PROTIUS_STAKING_APP_ID,
+    appArgs: [new Uint8Array(Buffer.from("stake"))],
+    suggestedParams,
+  });
 
-  console.log("[stake] Transaction ID:", result.txIds[0]);
+  // Group transactions
+  const txnGroup = algosdk.assignGroupID([paymentTxn, appCallTxn]);
+  
+  // Sign and send
+  const signedTxns = await transactionSigner(txnGroup, [0, 1]);
+  const { txId } = await algod.sendRawTransaction(signedTxns).do();
+  await algosdk.waitForConfirmation(algod, txId, 4);
+  
+  console.log("[stake] Transaction ID:", txId);
 }
 
-/**
- * Withdraw/Unstake ALGO from the contract
- */
 export async function withdraw(
   activeAddress: string,
-  signer: algosdk.TransactionSigner,
+  transactionSigner: (txnGroup: algosdk.Transaction[], indexesToSign: number[]) => Promise<Uint8Array[]>,
   amountInAlgo: number
 ): Promise<void> {
   if (PROTIUS_STAKING_APP_ID === 0) {
@@ -149,21 +137,29 @@ export async function withdraw(
   }
 
   const algod = getAlgodClient();
-  const client = new ProtiusStakingClient(
-    {
-      sender: activeAddress,
-      resolveBy: "id",
-      id: PROTIUS_STAKING_APP_ID,
-    },
-    algod
-  );
-
+  const suggestedParams = await algod.getTransactionParams().do();
   const amountMicroAlgos = BigInt(Math.floor(amountInAlgo * 1_000_000));
 
-  const result = await client.withdraw(
-    { amount: amountMicroAlgos },
-    { sendParams: { signer } }
-  );
+  // Encode amount as big-endian uint64
+  const amountBytes = new Uint8Array(8);
+  const view = new DataView(amountBytes.buffer);
+  view.setBigUint64(0, amountMicroAlgos, false);
 
-  console.log("[withdraw] Transaction ID:", result.txIds[0]);
+  // App call to withdraw method
+  const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
+    from: activeAddress,
+    appIndex: PROTIUS_STAKING_APP_ID,
+    appArgs: [
+      new Uint8Array(Buffer.from("withdraw")),
+      amountBytes,
+    ],
+    suggestedParams,
+  });
+
+  // Sign and send
+  const signedTxns = await transactionSigner([appCallTxn], [0]);
+  const { txId } = await algod.sendRawTransaction(signedTxns).do();
+  await algosdk.waitForConfirmation(algod, txId, 4);
+  
+  console.log("[withdraw] Transaction ID:", txId);
 }

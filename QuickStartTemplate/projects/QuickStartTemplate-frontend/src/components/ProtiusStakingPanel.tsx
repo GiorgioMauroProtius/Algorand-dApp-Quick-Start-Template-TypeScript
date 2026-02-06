@@ -9,14 +9,13 @@ import {
 } from "../contracts/protiusStakingApi";
 
 const ProtiusStakingPanel: React.FC = () => {
-  const { activeAddress, isReady, signer } = useWallet();
+  const { activeAddress, isReady, transactionSigner } = useWallet();
 
   const [stakingState, setStakingState] = useState<StakingState | null>(null);
   const [amount, setAmount] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  // User is opted in if we can read their local state
   const isOptedIn =
     stakingState !== null && stakingState.userStake !== undefined;
 
@@ -44,7 +43,7 @@ const ProtiusStakingPanel: React.FC = () => {
   };
 
   const handleOptIn = async () => {
-    if (!activeAddress || !signer) {
+    if (!activeAddress || !transactionSigner) {
       setMessage("Wallet not connected.");
       return;
     }
@@ -52,7 +51,7 @@ const ProtiusStakingPanel: React.FC = () => {
     try {
       setIsBusy(true);
       setMessage("Sending opt-in transaction...");
-      await optIn(activeAddress, signer);
+      await optIn(activeAddress, transactionSigner);
       await loadState();
       setMessage("✅ Opted in successfully!");
     } catch (err: any) {
@@ -64,7 +63,7 @@ const ProtiusStakingPanel: React.FC = () => {
   };
 
   const handleStake = async () => {
-    if (!activeAddress || !signer) {
+    if (!activeAddress || !transactionSigner) {
       setMessage("Wallet not connected.");
       return;
     }
@@ -78,7 +77,7 @@ const ProtiusStakingPanel: React.FC = () => {
     try {
       setIsBusy(true);
       setMessage("Sending stake transaction...");
-      await stakeApi(activeAddress, signer, amountNum);
+      await stakeApi(activeAddress, transactionSigner, amountNum);
       await loadState();
       setAmount("");
       setMessage(`✅ Staked ${amountNum} ALGO successfully!`);
@@ -91,7 +90,7 @@ const ProtiusStakingPanel: React.FC = () => {
   };
 
   const handleWithdraw = async () => {
-    if (!activeAddress || !signer) {
+    if (!activeAddress || !transactionSigner) {
       setMessage("Wallet not connected.");
       return;
     }
@@ -105,7 +104,7 @@ const ProtiusStakingPanel: React.FC = () => {
     try {
       setIsBusy(true);
       setMessage("Sending withdraw transaction...");
-      await withdrawApi(activeAddress, signer, amountNum);
+      await withdrawApi(activeAddress, transactionSigner, amountNum);
       await loadState();
       setAmount("");
       setMessage(`✅ Withdrew ${amountNum} ALGO successfully!`);
