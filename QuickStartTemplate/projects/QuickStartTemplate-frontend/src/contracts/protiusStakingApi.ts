@@ -1,6 +1,5 @@
 import algosdk from "algosdk";
 import { getAlgodClient } from "../utils/algodClient";
-import { ProtiusStakingClient } from "./ProtiusStakingClient";
 
 // MUST match your deployed app
 const PROTIUS_STAKING_APP_ID = Number(
@@ -26,7 +25,7 @@ export async function fetchStakingState(
       .accountApplicationInformation(accountAddress, PROTIUS_STAKING_APP_ID)
       .do();
 
-    const localState = acctInfo["app-local-state"]?.["key-value"] ?? [];
+    const localState = acctInfo.appLocalState?.keyValue ?? [];
     let userStake = 0n;
 
     for (const kv of localState) {
@@ -38,7 +37,7 @@ export async function fetchStakingState(
 
     // Global state
     const appInfo = await algod.getApplicationByID(PROTIUS_STAKING_APP_ID).do();
-    const globalState = appInfo.params["global-state"] ?? [];
+    const globalState = appInfo.params.globalState ?? [];
     let totalStake = 0n;
 
     for (const kv of globalState) {
@@ -74,14 +73,15 @@ export async function optIn(
 
   // Create opt-in transaction
   const optInTxn = algosdk.makeApplicationOptInTxnFromObject({
-    from: activeAddress,
+    sender: activeAddress,
     appIndex: PROTIUS_STAKING_APP_ID,
     suggestedParams,
   });
 
   // Sign and send
   const signedTxns = await transactionSigner([optInTxn], [0]);
-  const { txId } = await algod.sendRawTransaction(signedTxns).do();
+  const response = await algod.sendRawTransaction(signedTxns).do();
+  const txId = response.txid || response.txId;
   await algosdk.waitForConfirmation(algod, txId, 4);
   
   console.log("[optIn] Transaction ID:", txId);
@@ -102,15 +102,15 @@ export async function stake(
 
   // Payment to contract
   const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-    from: activeAddress,
-    to: algosdk.getApplicationAddress(PROTIUS_STAKING_APP_ID),
+    sender: activeAddress,
+    receiver: algosdk.getApplicationAddress(PROTIUS_STAKING_APP_ID),
     amount: amountMicroAlgos,
     suggestedParams,
   });
 
   // App call to stake method
   const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
-    from: activeAddress,
+    sender: activeAddress,
     appIndex: PROTIUS_STAKING_APP_ID,
     appArgs: [new Uint8Array(Buffer.from("stake"))],
     suggestedParams,
@@ -121,7 +121,8 @@ export async function stake(
   
   // Sign and send
   const signedTxns = await transactionSigner(txnGroup, [0, 1]);
-  const { txId } = await algod.sendRawTransaction(signedTxns).do();
+  const response = await algod.sendRawTransaction(signedTxns).do();
+  const txId = response.txid || response.txId;
   await algosdk.waitForConfirmation(algod, txId, 4);
   
   console.log("[stake] Transaction ID:", txId);
@@ -147,7 +148,7 @@ export async function withdraw(
 
   // App call to withdraw method
   const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
-    from: activeAddress,
+    sender: activeAddress,
     appIndex: PROTIUS_STAKING_APP_ID,
     appArgs: [
       new Uint8Array(Buffer.from("withdraw")),
@@ -158,7 +159,8 @@ export async function withdraw(
 
   // Sign and send
   const signedTxns = await transactionSigner([appCallTxn], [0]);
-  const { txId } = await algod.sendRawTransaction(signedTxns).do();
+  const response = await algod.sendRawTransaction(signedTxns).do();
+  const txId = response.txid || response.txId;
   await algosdk.waitForConfirmation(algod, txId, 4);
   
   console.log("[withdraw] Transaction ID:", txId);
