@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "buildCommand": "cd QuickStartTemplate/projects/QuickStartTemplate-frontend && npm ci && npm run build",
+  "outputDirectory": "QuickStartTemplate/projects/QuickStartTemplate-frontend/dist",
+  "installCommand": "cd QuickStartTemplate/projects/QuickStartTemplate-frontend && npm ci",
+  "framework": null,
+  "ignoreCommand": "exit 0"
+}
