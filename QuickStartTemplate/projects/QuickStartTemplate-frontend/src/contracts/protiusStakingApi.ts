@@ -29,7 +29,7 @@ export async function fetchStakingState(
     let userStake = 0n;
 
     for (const kv of localState) {
-      const key = Buffer.from(kv.key, "base64").toString("utf8");
+      const key = new TextDecoder().decode(new Uint8Array(Buffer.from(kv.key, "base64")));
       if (key === "stake" && kv.value?.uint !== undefined) {
         userStake = BigInt(kv.value.uint);
       }
@@ -41,7 +41,7 @@ export async function fetchStakingState(
     let totalStake = 0n;
 
     for (const kv of globalState) {
-      const key = Buffer.from(kv.key, "base64").toString("utf8");
+      const key = new TextDecoder().decode(new Uint8Array(Buffer.from(kv.key, "base64")));
       if (key === "total_stake" && kv.value?.uint !== undefined) {
         totalStake = BigInt(kv.value.uint);
       }
@@ -81,7 +81,7 @@ export async function optIn(
   // Sign and send
   const signedTxns = await transactionSigner([optInTxn], [0]);
   const response = await algod.sendRawTransaction(signedTxns).do();
-  const txId = response.txid || response.txId;
+  const txId = response.txid;
   await algosdk.waitForConfirmation(algod, txId, 4);
   
   console.log("[optIn] Transaction ID:", txId);
@@ -122,7 +122,7 @@ export async function stake(
   // Sign and send
   const signedTxns = await transactionSigner(txnGroup, [0, 1]);
   const response = await algod.sendRawTransaction(signedTxns).do();
-  const txId = response.txid || response.txId;
+  const txId = response.txid;
   await algosdk.waitForConfirmation(algod, txId, 4);
   
   console.log("[stake] Transaction ID:", txId);
@@ -160,7 +160,7 @@ export async function withdraw(
   // Sign and send
   const signedTxns = await transactionSigner([appCallTxn], [0]);
   const response = await algod.sendRawTransaction(signedTxns).do();
-  const txId = response.txid || response.txId;
+  const txId = response.txid;
   await algosdk.waitForConfirmation(algod, txId, 4);
   
   console.log("[withdraw] Transaction ID:", txId);
