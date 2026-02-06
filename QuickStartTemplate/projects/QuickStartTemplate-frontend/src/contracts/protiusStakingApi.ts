@@ -1,5 +1,6 @@
 import algosdk from "algosdk";
 import { getAlgodClient } from "../utils/algodClient";
+import { ProtiusStakingClient } from "./ProtiusStakingClient";
 
 // MUST match your deployed app
 const PROTIUS_STAKING_APP_ID = Number(
@@ -27,13 +28,11 @@ export async function fetchStakingState(
       .accountApplicationInformation(accountAddress, PROTIUS_STAKING_APP_ID)
       .do();
 
-    const localState =
-      acctInfo.appLocalState?.keyValue ?? [];
-
+    const localState = acctInfo.appLocalState?.keyValue ?? [];
     let userStake = 0n;
 
     for (const kv of localState) {
-      const key = Buffer.from(kv.key).toString("utf8");
+      const key = Buffer.from(kv.key, "base64").toString("utf8");
       if (key === "stake" && kv.value?.uint !== undefined) {
         userStake = BigInt(kv.value.uint);
       }
@@ -44,13 +43,11 @@ export async function fetchStakingState(
       .getApplicationByID(PROTIUS_STAKING_APP_ID)
       .do();
 
-    const globalState =
-      appInfo.params.globalState ?? [];
-
+    const globalState = appInfo.params.globalState ?? [];
     let totalStake = 0n;
 
     for (const kv of globalState) {
-      const key = Buffer.from(kv.key).toString("utf8");
+      const key = Buffer.from(kv.key, "base64").toString("utf8");
       if (key === "total_stake" && kv.value?.uint !== undefined) {
         totalStake = BigInt(kv.value.uint);
       }
@@ -68,19 +65,105 @@ export async function fetchStakingState(
 
 /**
  * ============================
- * TRACK-C DEMO TXs (NO-OP)
+ * REAL ON-CHAIN TRANSACTIONS
  * ============================
- * Reads are REAL
- * Writes are UI placeholders
  */
-export async function optIn(): Promise<void> {
-  console.warn("[optIn] Track-C demo mode – no-op");
+
+/**
+ * Opt-in to the staking app (one-time)
+ */
+export async function optIn(
+  activeAddress: string,
+  signer: algosdk.TransactionSigner
+): Promise<void> {
+  if (PROTIUS_STAKING_APP_ID === 0) {
+    throw new Error("VITE_PROTIUS_STAKING_APP_ID not configured");
+  }
+
+  const algod = getAlgodClient();
+  const client = new ProtiusStakingClient(
+    {
+      sender: activeAddress,
+      resolveBy: "id",
+      id: PROTIUS_STAKING_APP_ID,
+    },
+    algod
+  );
+
+  const result = await client.optIn.optInToApplication({}, { sendParams: { signer } });
+  console.log("[optIn] Transaction ID:", result.txIds[0]);
 }
 
-export async function stake(): Promise<void> {
-  console.warn("[stake] Track-C demo mode – no-op");
+/**
+ * Stake ALGO into the contract
+ */
+export async function stake(
+  activeAddress: string,
+  signer: algosdk.TransactionSigner,
+  amountInAlgo: number
+): Promise<void> {
+  if (PROTIUS_STAKING_APP_ID === 0) {
+    throw new Error("VITE_PROTIUS_STAKING_APP_ID not configured");
+  }
+
+  const algod = getAlgodClient();
+  const client = new ProtiusStakingClient(
+    {
+      sender: activeAddress,
+      resolveBy: "id",
+      id: PROTIUS_STAKING_APP_ID,
+    },
+    algod
+  );
+
+  const amountMicroAlgos = BigInt(Math.floor(amountInAlgo * 1_000_000));
+
+  // Create payment transaction to contract
+  const suggestedParams = await algod.getTransactionParams().do();
+  const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+    from: activeAddress,
+    to: algosdk.getApplicationAddress(PROTIUS_STAKING_APP_ID),
+    amount: amountMicroAlgos,
+    suggestedParams,
+  });
+
+  // Call stake method
+  const result = await client.stake(
+    { payment: paymentTxn },
+    { sendParams: { signer } }
+  );
+
+  console.log("[stake] Transaction ID:", result.txIds[0]);
 }
 
-export async function withdraw(): Promise<void> {
-  console.warn("[withdraw] Track-C demo mode – no-op");
+/**
+ * Withdraw/Unstake ALGO from the contract
+ */
+export async function withdraw(
+  activeAddress: string,
+  signer: algosdk.TransactionSigner,
+  amountInAlgo: number
+): Promise<void> {
+  if (PROTIUS_STAKING_APP_ID === 0) {
+    throw new Error("VITE_PROTIUS_STAKING_APP_ID not configured");
+  }
+
+  const algod = getAlgodClient();
+  const client = new ProtiusStakingClient(
+    {
+      sender: activeAddress,
+      resolveBy: "id",
+      id: PROTIUS_STAKING_APP_ID,
+    },
+    algod
+  );
+
+  const amountMicroAlgos = BigInt(Math.floor(amountInAlgo * 1_000_000));
+
+  const result = await client.withdraw(
+    { amount: amountMicroAlgos },
+    { sendParams: { signer } }
+  );
+
+  console.log("[withdraw] Transaction ID:", result.txIds[0]);
 }
