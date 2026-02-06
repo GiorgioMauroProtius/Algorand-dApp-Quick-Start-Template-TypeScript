@@ -12,6 +12,18 @@ export type StakingState = {
 };
 
 /**
+ * Helper to decode base64 string to UTF-8
+ */
+function base64ToUtf8(base64: string): string {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+/**
  * READ STATE (REAL ON-CHAIN)
  */
 export async function fetchStakingState(
@@ -29,7 +41,7 @@ export async function fetchStakingState(
     let userStake = 0n;
 
     for (const kv of localState) {
-      const key = new TextDecoder().decode(new Uint8Array(Buffer.from(kv.key, "base64")));
+      const key = base64ToUtf8(kv.key);
       if (key === "stake" && kv.value?.uint !== undefined) {
         userStake = BigInt(kv.value.uint);
       }
@@ -41,7 +53,7 @@ export async function fetchStakingState(
     let totalStake = 0n;
 
     for (const kv of globalState) {
-      const key = new TextDecoder().decode(new Uint8Array(Buffer.from(kv.key, "base64")));
+      const key = base64ToUtf8(kv.key);
       if (key === "total_stake" && kv.value?.uint !== undefined) {
         totalStake = BigInt(kv.value.uint);
       }
@@ -109,10 +121,11 @@ export async function stake(
   });
 
   // App call to stake method
+  const encoder = new TextEncoder();
   const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
     sender: activeAddress,
     appIndex: PROTIUS_STAKING_APP_ID,
-    appArgs: [new Uint8Array(Buffer.from("stake"))],
+    appArgs: [encoder.encode("stake")],
     suggestedParams,
   });
 
@@ -147,11 +160,12 @@ export async function withdraw(
   view.setBigUint64(0, amountMicroAlgos, false);
 
   // App call to withdraw method
+  const encoder = new TextEncoder();
   const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
     sender: activeAddress,
     appIndex: PROTIUS_STAKING_APP_ID,
     appArgs: [
-      new Uint8Array(Buffer.from("withdraw")),
+      encoder.encode("withdraw"),
       amountBytes,
     ],
     suggestedParams,
