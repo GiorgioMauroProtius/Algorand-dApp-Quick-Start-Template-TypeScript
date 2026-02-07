@@ -1,7 +1,7 @@
+// filepath: /workspaces/Algorand-dApp-Quick-Start-Template-TypeScript/QuickStartTemplate/projects/QuickStartTemplate-frontend/src/Home.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet-react";
 import ConnectWallet from "./components/ConnectWallet";
-import AppCalls from "./components/AppCalls";
 import ProtiusStakingPanel from "./components/ProtiusStakingPanel";
 
 type Project = {
@@ -63,7 +63,7 @@ const COUNTRIES = [
   "Congo, Democratic Republic of the",
   "Congo, Republic of the",
   "Costa Rica",
-  "Côte d’Ivoire",
+  "Côte d'Ivoire",
   "Croatia",
   "Cuba",
   "Cyprus",
@@ -242,7 +242,6 @@ const Home: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
-  const setModalState = (v: boolean) => setIsModalOpen(v);
 
   const registrationRef = useRef<HTMLDivElement | null>(null);
   const approvalRef = useRef<HTMLDivElement | null>(null);
@@ -1181,132 +1180,97 @@ const Home: React.FC = () => {
           )}
         </section>
 
-        {/* Investor + HelloWorld ----------------------------------------- */}
-        <div
+        {/* Investor / staking demo (full width) --------------------------- */}
+        <section
           ref={investorRef}
-          className="grid md:grid-cols-[1.4fr,1.2fr] gap-6"
+          className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3"
         >
-          {/* 3. Investor / staking demo ---------------------------------- */}
-          <section className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm text-black font-semibold">
-                3
-              </span>
-              <h2 className="font-semibold text-emerald-100">
-                Investor / staking demo
-              </h2>
-            </div>
-            <p className="text-xs text-emerald-100/80">
-              Stake on approved projects using the Protius staking smart
-              contract placeholder panel. This demo is front-end only for now —{" "}
-              next we wire it to the live contract.
-            </p>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm text-black font-semibold">
+              3
+            </span>
+            <h2 className="font-semibold text-emerald-100">
+              Investor / staking demo
+            </h2>
+          </div>
+          <p className="text-xs text-emerald-100/80">
+            Stake on approved projects using the Protius staking smart
+            contract placeholder panel. This demo is front-end only for now —{" "}
+            next we wire it to the live contract.
+          </p>
 
-            {approvedProjects.length > 0 ? (
-              <div className="space-y-3">
-                {approvedProjects.map((p) => {
-                  const stakeValue = stakeInputs[p.id] ?? "";
-                  return (
-                    <div
-                      key={p.id}
-                      className="rounded-lg border border-emerald-500/40 bg-slate-900/70 px-3 py-3 space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-sm font-semibold text-emerald-100">
-                            {p.name}
-                          </div>
-                          <div className="text-xs text-emerald-200/80">
-                            {formatCapacityDisplay(p.capacity)} —{" "}
-                            {p.country || "Country"}
-                          </div>
+          {approvedProjects.length > 0 ? (
+            <div className="space-y-3">
+              {approvedProjects.map((p) => {
+                const stakeValue = stakeInputs[p.id] ?? "";
+                return (
+                  <div
+                    key={p.id}
+                    className="rounded-lg border border-emerald-500/40 bg-slate-900/70 px-3 py-3 space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-emerald-100">
+                          {p.name}
                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-[1.4fr,auto] gap-3 items-end">
-                        <div>
-                          <label className="block text-[11px] font-medium mb-1 text-emerald-100">
-                            Stake amount (demo USDC)
-                          </label>
-                          <input
-                            className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-3 py-1.5 text-sm text-emerald-50 placeholder:text-emerald-200/40"
-                            placeholder="e.g., 1.00"
-                            value={stakeValue}
-                            onChange={(e) =>
-                              setStakeInputs((prev) => ({
-                                ...prev,
-                                [p.id]: formatInputWithCommas(e.target.value),
-                              }))
-                            }
-                          />
+                        <div className="text-xs text-emerald-200/80">
+                          {formatCapacityDisplay(p.capacity)} —{" "}
+                          {p.country || "Country"}
                         </div>
-                        <button
-                          type="button"
-                          className="rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold px-4 py-1.5"
-                          onClick={() => handleStakeDemo(p.id)}
-                          disabled={!stakeValue.trim()}
-                        >
-                          Stake (demo only)
-                        </button>
-                      </div>
-
-                      <div className="text-xs text-emerald-200/80">
-                        Total demo staked:{" "}
-                        <span className="font-semibold">
-                          {formatStake(p.totalStaked)} USDC
-                        </span>{" "}
-                        — <span className="font-semibold">{p.stakers}</span>{" "}
-                        stakers
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-xs text-emerald-200/70">
-                Approve at least one project in step 2 to enable the staking
-                demo.
-              </p>
-            )}
 
-            {/* Protius smart-contract placeholder panel */}
-            <div className="mt-4 pt-3 border-t border-emerald-500/30">
-              <ProtiusStakingPanel />
-            </div>
-          </section>
+                    <div className="grid grid-cols-[1.4fr,auto] gap-3 items-end">
+                      <div>
+                        <label className="block text-[11px] font-medium mb-1 text-emerald-100">
+                          Stake amount (demo USDC)
+                        </label>
+                        <input
+                          className="w-full rounded-md bg-slate-900/80 border border-emerald-500/40 px-3 py-1.5 text-sm text-emerald-50 placeholder:text-emerald-200/40"
+                          placeholder="e.g., 1.00"
+                          value={stakeValue}
+                          onChange={(e) =>
+                            setStakeInputs((prev) => ({
+                              ...prev,
+                              [p.id]: formatInputWithCommas(e.target.value),
+                            }))
+                          }
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold px-4 py-1.5"
+                        onClick={() => handleStakeDemo(p.id)}
+                        disabled={!stakeValue.trim()}
+                      >
+                        Stake (demo only)
+                      </button>
+                    </div>
 
-          {/* 4. HelloWorld panel ----------------------------------------- */}
-          <section className="bg-slate-950/80 border border-emerald-500/40 rounded-xl shadow-lg p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm text-black font-semibold">
-                4
-              </span>
-              <h2 className="font-semibold text-emerald-100">
-                HelloWorld on Algorand (demo wire-up)
-              </h2>
+                    <div className="text-xs text-emerald-200/80">
+                      Total demo staked:{" "}
+                      <span className="font-semibold">
+                        {formatStake(p.totalStaked)} USDC
+                      </span>{" "}
+                      — <span className="font-semibold">{p.stakers}</span>{" "}
+                      stakers
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <p className="text-xs text-emerald-100/80">
-              This panel talks to the live{" "}
-              <span className="font-semibold">HelloWorld</span> smart contract
-              already deployed on Algorand TestNet. For now it returns a simple
-              response; next we replace this with the Protius staking contract.
+          ) : (
+            <p className="text-xs text-emerald-200/70">
+              Approve at least one project in step 2 to enable the staking
+              demo.
             </p>
+          )}
 
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setModalState(true)}
-                className="rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold px-4 py-2 shadow-lg shadow-emerald-500/30"
-              >
-                Open HelloWorld demo
-              </button>
-            </div>
-
-            <div className="mt-2">
-              <AppCalls openModal={isModalOpen} setModalState={setModalState} />
-            </div>
-          </section>
-        </div>
+          {/* Protius smart-contract placeholder panel */}
+          <div className="mt-4 pt-3 border-t border-emerald-500/30">
+            <ProtiusStakingPanel />
+          </div>
+        </section>
 
         <footer className="pt-4 text-center">
           <p className="text-white/85 text-xs inline-block bg-black/40 px-3 py-1 rounded-full drop-shadow-md">
@@ -1397,7 +1361,7 @@ const Home: React.FC = () => {
               </div>
             )}
 
-            {/* 🔽 Track B ADDITION START */}
+            {/* Track B ADDITION - Project-level staking preview */}
             <div className="pt-3 border-t border-emerald-500/30">
               <div className="font-semibold text-emerald-200 text-xs">
                 Track B — Project-level staking (preview)
@@ -1409,7 +1373,6 @@ const Home: React.FC = () => {
               </p>
               <ProtiusStakingPanel />
             </div>
-            {/* 🔼 Track B ADDITION END */}
           </div>
         </div>
       )}
