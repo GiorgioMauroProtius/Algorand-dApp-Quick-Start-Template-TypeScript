@@ -9,15 +9,13 @@ import {
 } from "../contracts/protiusStakingApi";
 
 const ProtiusStakingPanel: React.FC = () => {
-  const { activeAddress, isReady } = useWallet();
+  const { activeAddress, isReady, transactionSigner } = useWallet();
 
   const [stakingState, setStakingState] = useState<StakingState | null>(null);
   const [amount, setAmount] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  // Track-C logic:
-  // If we can read local state → user is opted in
   const isOptedIn =
     stakingState !== null && stakingState.userStake !== undefined;
 
@@ -45,49 +43,74 @@ const ProtiusStakingPanel: React.FC = () => {
   };
 
   const handleOptIn = async () => {
+    if (!activeAddress || !transactionSigner) {
+      setMessage("Wallet not connected.");
+      return;
+    }
+
     try {
       setIsBusy(true);
-      setMessage(null);
-      await optIn(); // Track-C no-op
+      setMessage("Sending opt-in transaction...");
+      await optIn(activeAddress, transactionSigner);
       await loadState();
-      setMessage(
-        "Staking initialized (demo mode). On-chain opt-in required once."
-      );
-    } catch (err) {
+      setMessage("✅ Opted in successfully!");
+    } catch (err: any) {
       console.error("[ProtiusStakingPanel] Opt-in failed", err);
-      setMessage("Opt-in failed.");
+      setMessage(`Opt-in failed: ${err.message || "Unknown error"}`);
     } finally {
       setIsBusy(false);
     }
   };
 
   const handleStake = async () => {
+    if (!activeAddress || !transactionSigner) {
+      setMessage("Wallet not connected.");
+      return;
+    }
+
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setMessage("Please enter a valid amount.");
+      return;
+    }
+
     try {
       setIsBusy(true);
-      setMessage(null);
-      await stakeApi(); // Track-C no-op
-      setMessage(
-        "Stake action submitted (demo). On-chain stake reflected once executed."
-      );
-    } catch (err) {
+      setMessage("Sending stake transaction...");
+      await stakeApi(activeAddress, transactionSigner, amountNum);
+      await loadState();
+      setAmount("");
+      setMessage(`✅ Staked ${amountNum} ALGO successfully!`);
+    } catch (err: any) {
       console.error(err);
-      setMessage("Stake failed.");
+      setMessage(`Stake failed: ${err.message || "Unknown error"}`);
     } finally {
       setIsBusy(false);
     }
   };
 
   const handleWithdraw = async () => {
+    if (!activeAddress || !transactionSigner) {
+      setMessage("Wallet not connected.");
+      return;
+    }
+
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setMessage("Please enter a valid amount.");
+      return;
+    }
+
     try {
       setIsBusy(true);
-      setMessage(null);
-      await withdrawApi(); // Track-C no-op
-      setMessage(
-        "Withdraw action submitted (demo). On-chain withdraw reflected once executed."
-      );
-    } catch (err) {
+      setMessage("Sending withdraw transaction...");
+      await withdrawApi(activeAddress, transactionSigner, amountNum);
+      await loadState();
+      setAmount("");
+      setMessage(`✅ Withdrew ${amountNum} ALGO successfully!`);
+    } catch (err: any) {
       console.error(err);
-      setMessage("Withdraw failed.");
+      setMessage(`Withdraw failed: ${err.message || "Unknown error"}`);
     } finally {
       setIsBusy(false);
     }
@@ -95,25 +118,23 @@ const ProtiusStakingPanel: React.FC = () => {
 
   return (
     <div className="rounded-lg border border-emerald-500/40 bg-slate-900/80 p-4 space-y-3 text-sm text-emerald-50">
-      <p className="text-xs text-emerald-100/85">
-        Protius staking panel (Algorand TestNet — Track-C demo).
+      <p className="text-xs text-emerald-100/85 font-semibold">
+        🟢 Protius Staking (Algorand TestNet - LIVE)
       </p>
 
       <div className="text-xs space-y-1">
         <div>Wallet: {activeAddress ?? "not connected"}</div>
         <div>
-          Your stake (on-chain):{" "}
-          {stakingState
-            ? Number(stakingState.userStake) / 1_000_000
-            : 0}{" "}
-          ALGO
+          Your stake:{" "}
+          <span className="font-mono">
+            {stakingState ? Number(stakingState.userStake) / 1_000_000 : 0} ALGO
+          </span>
         </div>
         <div>
-          Total pool (on-chain):{" "}
-          {stakingState
-            ? Number(stakingState.totalStake) / 1_000_000
-            : 0}{" "}
-          ALGO
+          Total pool:{" "}
+          <span className="font-mono">
+            {stakingState ? Number(stakingState.totalStake) / 1_000_000 : 0} ALGO
+          </span>
         </div>
       </div>
 
@@ -124,38 +145,43 @@ const ProtiusStakingPanel: React.FC = () => {
           disabled={!activeAddress || isBusy}
           className="w-full rounded-md bg-amber-400 px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-amber-300 disabled:opacity-40"
         >
-          Initialize staking (demo)
+          {isBusy ? "Processing..." : "Opt-in to Staking"}
         </button>
       )}
 
       <input
         type="number"
-        step="0.000001"
+        step="0.1"
+        min="0.1"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         className="w-full rounded-md px-2 py-1 text-black"
-        placeholder="Amount in ALGO (demo input)"
-        disabled
+        placeholder="Amount in ALGO"
+        disabled={!isOptedIn || isBusy}
       />
 
       <div className="flex gap-2">
         <button
           onClick={handleStake}
           disabled={!activeAddress || isBusy || !isOptedIn}
-          className="flex-1 bg-emerald-500 text-black rounded px-2 py-1 disabled:opacity-40"
+          className="flex-1 bg-emerald-500 text-black rounded px-2 py-1 font-semibold hover:bg-emerald-400 disabled:opacity-40"
         >
-          Stake
+          {isBusy ? "⏳" : "Stake"}
         </button>
         <button
           onClick={handleWithdraw}
           disabled={!activeAddress || isBusy || !isOptedIn}
-          className="flex-1 border border-emerald-500 rounded px-2 py-1 disabled:opacity-40"
+          className="flex-1 border border-emerald-500 rounded px-2 py-1 hover:bg-emerald-500/20 disabled:opacity-40"
         >
-          Withdraw
+          {isBusy ? "⏳" : "Withdraw"}
         </button>
       </div>
 
-      {message && <p className="text-xs">{message}</p>}
+      {message && (
+        <p className={`text-xs ${message.startsWith("✅") ? "text-emerald-400" : "text-red-400"}`}>
+          {message}
+        </p>
+      )}
     </div>
   );
 };
