@@ -130,8 +130,9 @@ export async function stake(
 
 export async function withdraw(
   activeAddress: string,
-  transactionSigner: (txnGroup: algosdk.Transaction[], indexesToSign: number[]) => Promise<Uint8Array[]>
-): Promise<bigint> {
+  transactionSigner: (txnGroup: algosdk.Transaction[], indexesToSign: number[]) => Promise<Uint8Array[]>,
+  _amountInAlgo: number // Component passes this but contract doesn't use it
+): Promise<void> {
   if (PROTIUS_STAKING_APP_ID === 0) {
     throw new Error("VITE_PROTIUS_STAKING_APP_ID not configured");
   }
@@ -154,16 +155,7 @@ export async function withdraw(
   const signedTxns = await transactionSigner([appCallTxn], [0]);
   const response = await algod.sendRawTransaction(signedTxns).do();
   const txId = response.txid;
-  const confirmedTxn = await algosdk.waitForConfirmation(algod, txId, 4);
+  await algosdk.waitForConfirmation(algod, txId, 4);
   
   console.log("[withdraw] Transaction ID:", txId);
-  
-  // Extract return value from logs
-  const logs = confirmedTxn.logs || [];
-  if (logs.length > 0) {
-    const returnValue = new DataView(logs[0].buffer).getBigUint64(4, false);
-    return returnValue;
-  }
-  
-  return 0n;
 }
