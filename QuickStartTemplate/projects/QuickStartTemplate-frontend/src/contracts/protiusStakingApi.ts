@@ -29,9 +29,8 @@ export async function fetchStakingState(
     let userStake = 0n;
 
     for (const kv of localState) {
-      // kv.key is Uint8Array
       const key = new TextDecoder().decode(kv.key);
-      if (key === "stake" && kv.value?.uint !== undefined) {
+      if (key === "s" && kv.value?.uint !== undefined) {
         userStake = BigInt(kv.value.uint);
       }
     }
@@ -42,9 +41,8 @@ export async function fetchStakingState(
     let totalStake = 0n;
 
     for (const kv of globalState) {
-      // kv.key is Uint8Array
       const key = new TextDecoder().decode(kv.key);
-      if (key === "total_stake" && kv.value?.uint !== undefined) {
+      if (key === "totalStaked" && kv.value?.uint !== undefined) {
         totalStake = BigInt(kv.value.uint);
       }
     }
@@ -73,14 +71,12 @@ export async function optIn(
   const algod = getAlgodClient();
   const suggestedParams = await algod.getTransactionParams().do();
 
-  // Create opt-in transaction
   const optInTxn = algosdk.makeApplicationOptInTxnFromObject({
     sender: activeAddress,
     appIndex: PROTIUS_STAKING_APP_ID,
     suggestedParams,
   });
 
-  // Sign and send
   const signedTxns = await transactionSigner([optInTxn], [0]);
   const response = await algod.sendRawTransaction(signedTxns).do();
   const txId = response.txid;
@@ -102,70 +98,32 @@ export async function stake(
   const suggestedParams = await algod.getTransactionParams().do();
   const amountMicroAlgos = BigInt(Math.floor(amountInAlgo * 1_000_000));
 
-  // Payment to contract
-  const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-    sender: activeAddress,
-    receiver: algosdk.getApplicationAddress(PROTIUS_STAKING_APP_ID),
-    amount: amountMicroAlgos,
-    suggestedParams,
-  });
+  // ABI method selector for stake(uint64)void
+  const stakeMethodSelector = new Uint8Array([0xfa, 0x9d, 0x92, 0xf5]);
+  
+  // Encode the amount as uint64 (8 bytes, big-endian)
+  const amountBuffer = new ArrayBuffer(8);
+  const amountView = new DataView(amountBuffer);
+  amountView.setBigUint64(0, amountMicroAlgos, false); // false = big-endian
+  
+  // Combine selector + encoded amount
+  const appArgs = new Uint8Array(stakeMethodSelector.length + 8);
+  appArgs.set(stakeMethodSelector, 0);
+  appArgs.set(new Uint8Array(amountBuffer), stakeMethodSelector.length);
 
-  // App call to stake method
-  const encoder = new TextEncoder();
+  // App call to stake method (ABI format)
   const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
     sender: activeAddress,
     appIndex: PROTIUS_STAKING_APP_ID,
-    appArgs: [encoder.encode("stake")],
+    appArgs: [appArgs],
     suggestedParams,
   });
 
-  // Group transactions
-  const txnGroup = algosdk.assignGroupID([paymentTxn, appCallTxn]);
-  
-  // Sign and send
-  const signedTxns = await transactionSigner(txnGroup, [0, 1]);
-  const response = await algod.sendRawTransaction(signedTxns).do();
-  const txId = response.txid;
-  await algosdk.waitForConfirmation(algod, txId, 4);
-  
-  console.log("[stake] Transaction ID:", txId);
-}
-
-export async function withdraw(
-  activeAddress: string,
-  transactionSigner: (txnGroup: algosdk.Transaction[], indexesToSign: number[]) => Promise<Uint8Array[]>,
-  amountInAlgo: number
-): Promise<void> {
-  if (PROTIUS_STAKING_APP_ID === 0) {
-    throw new Error("VITE_PROTIUS_STAKING_APP_ID not configured");
-  }
-
-  const algod = getAlgodClient();
-  const suggestedParams = await algod.getTransactionParams().do();
-  const amountMicroAlgos = BigInt(Math.floor(amountInAlgo * 1_000_000));
-
-  // Encode amount as big-endian uint64
-  const amountBytes = new Uint8Array(8);
-  const view = new DataView(amountBytes.buffer);
-  view.setBigUint64(0, amountMicroAlgos, false);
-
-  // App call to withdraw method
-  const encoder = new TextEncoder();
-  const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
-    sender: activeAddress,
-    appIndex: PROTIUS_STAKING_APP_ID,
-    appArgs: [
-      encoder.encode("withdraw"),
-      amountBytes,
-    ],
-    suggestedParams,
-  });
-
-  // Sign and send
+  // Sign and send (single transaction, not grouped)
   const signedTxns = await transactionSigner([appCallTxn], [0]);
   const response = await algod.sendRawTransaction(signedTxns).do();
   const txId = response.txid;
   await algosdk.waitForConfirmation(algod, txId, 4);
   
-  console.log("[withdraw] Transaction ID:", txId);
+  console.log("[stake] Transaction ID:", txId);
 }
