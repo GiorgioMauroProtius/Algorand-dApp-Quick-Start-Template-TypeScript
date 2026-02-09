@@ -119,11 +119,51 @@ export async function stake(
     suggestedParams,
   });
 
-  // Sign and send (single transaction, not grouped)
+  // Sign and send
   const signedTxns = await transactionSigner([appCallTxn], [0]);
   const response = await algod.sendRawTransaction(signedTxns).do();
   const txId = response.txid;
   await algosdk.waitForConfirmation(algod, txId, 4);
   
   console.log("[stake] Transaction ID:", txId);
+}
+
+export async function withdraw(
+  activeAddress: string,
+  transactionSigner: (txnGroup: algosdk.Transaction[], indexesToSign: number[]) => Promise<Uint8Array[]>
+): Promise<bigint> {
+  if (PROTIUS_STAKING_APP_ID === 0) {
+    throw new Error("VITE_PROTIUS_STAKING_APP_ID not configured");
+  }
+
+  const algod = getAlgodClient();
+  const suggestedParams = await algod.getTransactionParams().do();
+
+  // ABI method selector for withdraw()uint64
+  const withdrawMethodSelector = new Uint8Array([0x3a, 0x39, 0x5f, 0x2b]);
+
+  // App call to withdraw method
+  const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
+    sender: activeAddress,
+    appIndex: PROTIUS_STAKING_APP_ID,
+    appArgs: [withdrawMethodSelector],
+    suggestedParams,
+  });
+
+  // Sign and send
+  const signedTxns = await transactionSigner([appCallTxn], [0]);
+  const response = await algod.sendRawTransaction(signedTxns).do();
+  const txId = response.txid;
+  const confirmedTxn = await algosdk.waitForConfirmation(algod, txId, 4);
+  
+  console.log("[withdraw] Transaction ID:", txId);
+  
+  // Extract return value from logs
+  const logs = confirmedTxn.logs || [];
+  if (logs.length > 0) {
+    const returnValue = new DataView(logs[0].buffer).getBigUint64(4, false);
+    return returnValue;
+  }
+  
+  return 0n;
 }
