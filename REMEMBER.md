@@ -1,4 +1,29 @@
-Reminder: Manual deploy workflow and runner
+## URGENT: Uncommitted Work in "music funicular" Codespace (Feb 10-11, 2026)
+
+**STATUS:** Work completed successfully but NOT committed to Git. Codespace affected by GitHub EMEA incident (Feb 12, 2026).
+
+### Work Completed (Feb 10-11):
+- **Smart contract recreated from scratch** on Feb 10th
+- All smart contract issues fixed
+- Testing completed successfully 
+- **Final status: SUCCESS** (as of yesterday morning before EMEA incident)
+
+### Action Required:
+1. **WAIT** for GitHub to restore EMEA Codespaces
+2. **DO NOT** recreate the work in another Codespace
+3. Once "music funicular" is accessible:
+   - Immediately commit all changes
+   - Push to remote branch to preserve work
+   - Verify all smart contract changes are captured
+
+### Current Baseline (This Codespace):
+- Branch: `track-c-live-staking-v2`
+- Last commit: Feb 9, 2026 10:57 UTC - "fix: match withdraw function signature (3 params)"
+- Smart contract: `/smart_contracts/protius_staking/contract.algo.ts` (pre-recreation state)
+
+---
+
+## Previous Work: Manual deploy workflow and runner
 
 What I added:
 
