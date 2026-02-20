@@ -65,25 +65,11 @@ export async function withdraw(
   try {
     suggestedParams = await algod.getTransactionParams().do();
   } catch (err) {
-    throw new Error('Failed to fetch suggestedParams: ' + (err?.message || err));
+    throw new Error('Failed to fetch suggestedParams: ' + ((err as any)?.message || err));
   }
   if (!suggestedParams) {
     throw new Error('suggestedParams is null or undefined');
   }
-  // Sanitize suggestedParams for Algorand SDK
-  const sanitizedParams = {
-    fee: suggestedParams.fee > 0 ? Number(suggestedParams.fee) : 1000,
-    first: Number(suggestedParams.firstValid),
-    last: Number(suggestedParams.lastValid),
-    genesisHash: suggestedParams.genesisHash,
-    genesisID: suggestedParams.genesisID,
-    flatFee: suggestedParams.flatFee ?? false,
-  };
-  Object.entries(sanitizedParams).forEach(([key, value]) => {
-    if (value === undefined || value === null) {
-      throw new Error(`sanitizedParams.${key} is ${value}`);
-    }
-  });
 
   // Build app call transaction for withdraw
   let appCallTxn;
@@ -102,10 +88,10 @@ export async function withdraw(
       sender,
       appIndex: PROTIUS_STAKING_APP_ID,
       appArgs: [appArgs],
-      suggestedParams: sanitizedParams,
+      suggestedParams,
     });
   } catch (err) {
-    throw new Error('Failed to build app call transaction: ' + (err?.message || err));
+    throw new Error('Failed to build app call transaction: ' + ((err as any)?.message || err));
   }
 
   // Sign and send
@@ -116,7 +102,7 @@ export async function withdraw(
     txId = response.txid;
     await algosdk.waitForConfirmation(algod, txId, 4);
   } catch (err) {
-    throw new Error('Failed to sign/send/confirm withdraw transaction: ' + (err?.message || err));
+    throw new Error('Failed to sign/send/confirm withdraw transaction: ' + ((err as any)?.message || err));
   }
   console.log('[withdraw] Transaction sent. TxID:', txId);
 }
@@ -242,7 +228,7 @@ export async function stake(
   try {
     suggestedParams = await algod.getTransactionParams().do();
   } catch (err) {
-    throw new Error("Failed to fetch suggestedParams: " + (err?.message || err));
+    throw new Error("Failed to fetch suggestedParams: " + ((err as any)?.message || err));
   }
 
   const abiContract = new ABIContract(abiJson as any);
@@ -274,6 +260,6 @@ export async function stake(
     const result = await atc.execute(algod, 4);
     console.log("[stake] Transaction group sent. TxID:", result.txIDs);
   } catch (err) {
-    throw new Error("Failed to execute staking transaction group: " + (err?.message || err));
+    throw new Error("Failed to execute staking transaction group: " + ((err as any)?.message || err));
   }
 }
