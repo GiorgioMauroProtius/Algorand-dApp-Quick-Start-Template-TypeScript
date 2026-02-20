@@ -4,7 +4,7 @@
   "description": "Smart contract deployer",
   "type": "module",
   "scripts": {
-    "build": "algokit compile ts smart_contracts",
+    "build": "algokit compile ts smart_contracts && node fix-optin.mjs",
     "deploy": "algokit project deploy",
     "deploy:ci": "algokit project deploy",
     "lint": "eslint smart_contracts",

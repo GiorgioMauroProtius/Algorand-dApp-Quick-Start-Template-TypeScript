@@ -7,7 +7,13 @@ export interface ProjectStakingConfig {
 
 // Get app ID for Project 1 from environment
 const project1AppId = import.meta.env.VITE_PROTIUS_STAKING_APP_ID;
-const parsedProject1AppId = project1AppId ? Number(project1AppId) : null;
+if (!project1AppId) {
+  throw new Error("VITE_PROTIUS_STAKING_APP_ID is missing from environment. Please set it in .env.local or .env.");
+}
+const parsedProject1AppId = Number(project1AppId);
+if (!parsedProject1AppId || isNaN(parsedProject1AppId) || parsedProject1AppId <= 0) {
+  throw new Error("VITE_PROTIUS_STAKING_APP_ID is invalid. Must be a positive integer.");
+}
 
 export const PROJECT_STAKING_CONFIGS: ProjectStakingConfig[] = [
   {

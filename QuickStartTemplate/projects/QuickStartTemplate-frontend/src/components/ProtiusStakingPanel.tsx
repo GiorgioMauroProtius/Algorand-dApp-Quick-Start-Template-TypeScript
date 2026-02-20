@@ -19,6 +19,9 @@ const ProtiusStakingPanel: React.FC = () => {
   const isOptedIn =
     stakingState !== null && stakingState.userStake !== undefined;
 
+  console.log('[ProtiusStakingPanel] stakingState:', stakingState);
+  console.log('[ProtiusStakingPanel] isOptedIn:', isOptedIn);
+
   useEffect(() => {
     if (isReady && activeAddress) {
       void loadState();
@@ -67,23 +70,34 @@ const ProtiusStakingPanel: React.FC = () => {
       setMessage("Wallet not connected.");
       return;
     }
-
+    if (!isOptedIn) {
+      setMessage("You must opt-in before staking.");
+      return;
+    }
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
       setMessage("Please enter a valid amount.");
       return;
     }
-
     try {
       setIsBusy(true);
       setMessage("Sending stake transaction...");
       await stakeApi(activeAddress, transactionSigner, amountNum);
-      await loadState();
+      await loadState(); // Refresh state after stake
       setAmount("");
       setMessage(`✅ Staked ${amountNum} ALGO successfully!`);
     } catch (err: any) {
       console.error(err);
-      setMessage(`Stake failed: ${err.message || "Unknown error"}`);
+      // Error handling for common cases
+      if (err.message?.includes("not opted-in")) {
+        setMessage("Stake failed: You must opt-in before staking.");
+      } else if (err.message?.includes("insufficient funds") || err.message?.includes("min balance")) {
+        setMessage("Stake failed: Insufficient funds or minimum balance not met.");
+      } else if (err.message?.includes("group size") || err.message?.includes("group index") || err.message?.includes("rejected")) {
+        setMessage("Stake failed: Transaction rejected (group size/order).");
+      } else {
+        setMessage(`Stake failed: ${err.message || "Unknown error"}`);
+      }
     } finally {
       setIsBusy(false);
     }
@@ -94,23 +108,34 @@ const ProtiusStakingPanel: React.FC = () => {
       setMessage("Wallet not connected.");
       return;
     }
-
+    if (!isOptedIn) {
+      setMessage("You must opt-in before withdrawing.");
+      return;
+    }
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
       setMessage("Please enter a valid amount.");
       return;
     }
-
     try {
       setIsBusy(true);
       setMessage("Sending withdraw transaction...");
       await withdrawApi(activeAddress, transactionSigner, amountNum);
-      await loadState();
+      await loadState(); // Refresh state after withdraw
       setAmount("");
       setMessage(`✅ Withdrew ${amountNum} ALGO successfully!`);
     } catch (err: any) {
       console.error(err);
-      setMessage(`Withdraw failed: ${err.message || "Unknown error"}`);
+      // Error handling for common cases
+      if (err.message?.includes("not opted-in")) {
+        setMessage("Withdraw failed: You must opt-in before withdrawing.");
+      } else if (err.message?.includes("insufficient funds") || err.message?.includes("min balance")) {
+        setMessage("Withdraw failed: Insufficient funds or minimum balance not met.");
+      } else if (err.message?.includes("group size") || err.message?.includes("group index") || err.message?.includes("rejected")) {
+        setMessage("Withdraw failed: Transaction rejected (group size/order).");
+      } else {
+        setMessage(`Withdraw failed: ${err.message || "Unknown error"}`);
+      }
     } finally {
       setIsBusy(false);
     }
@@ -127,7 +152,9 @@ const ProtiusStakingPanel: React.FC = () => {
         <div>
           Your stake:{" "}
           <span className="font-mono">
-            {stakingState ? Number(stakingState.userStake) / 1_000_000 : 0} ALGO
+            {stakingState && stakingState.userStake !== undefined
+              ? Number(stakingState.userStake) / 1_000_000
+              : 0} ALGO
           </span>
         </div>
         <div>

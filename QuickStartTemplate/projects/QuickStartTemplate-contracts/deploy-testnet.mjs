@@ -1,5 +1,13 @@
 import algosdk from "algosdk";
 import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { config } from "dotenv";
+
+// Load .env.testnet file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+config({ path: path.join(__dirname, ".env.testnet") });
 
 // ---------- Algod (TestNet via AlgoNode) ----------
 const algod = new algosdk.Algodv2(
@@ -21,7 +29,14 @@ const clear = fs.readFileSync(
 // ---------- Deployer ----------
 const mnemonic = process.env.DEPLOYER_MNEMONIC;
 if (!mnemonic) {
-  console.error("❌ DEPLOYER_MNEMONIC not set");
+  console.error("\n❌ DEPLOYER_MNEMONIC not set");
+  console.error("\nSetup instructions:");
+  console.error("1. Copy .env.testnet.template to .env.testnet:");
+  console.error("   cp .env.testnet.template .env.testnet");
+  console.error("\n2. Edit .env.testnet and paste your 25-word mnemonic");
+  console.error("   Get testnet ALGO from: https://dispenser.algorandfoundation.org/");
+  console.error("\n3. Run deploy again:");
+  console.error("   node deploy-testnet.mjs\n");
   process.exit(1);
 }
 
@@ -62,9 +77,9 @@ const txn = algosdk.makeApplicationCreateTxnFromObject({
   approvalProgram: approvalBytes,
   clearProgram: clearBytes,
 
-  numGlobalInts: 5,
-  numGlobalByteSlices: 0,
-  numLocalInts: 3,
+  numGlobalInts: 7,        // fundingGoal, minimumGoal, stakingDeadline, totalStaked, isFunded, financialCloseReached, premiumPool
+  numGlobalByteSlices: 1,  // developer (address)
+  numLocalInts: 2,         // stakeAmount, hasWithdrawn
   numLocalByteSlices: 0,
 });
 
@@ -96,6 +111,51 @@ console.log(
   "🔎 Explorer:",
   `https://testnet.algoexplorer.io/application/${appId}`
 );
+
+// ---------- Initialize the contract ----------
+console.log("\n📝 Initializing contract...");
+
+const arc56 = JSON.parse(
+  fs.readFileSync("out/smart_contracts/protius_staking/ProtiusStaking.arc56.json", "utf8")
+);
+
+// Find the init method
+const initMethod = arc56.methods.find(m => m.name === "init");
+if (!initMethod) {
+  console.error("❌ Could not find init method in ARC56");
+  process.exit(1);
+}
+
+// Create ABI method
+const abiMethod = new algosdk.ABIMethod(initMethod);
+
+// Prepare init arguments
+const fundingGoal = 1_000_000_000; // 1000 ALGO in microAlgos (pool target)
+const minimumGoal = 5_000_000;     // 5 ALGO in microAlgos (minimum total to succeed)
+const stakingPeriodSeconds = 86400 * 30; // 30 days
+
+const atc = new algosdk.AtomicTransactionComposer();
+const initParams = await algod.getTransactionParams().do();
+
+atc.addMethodCall({
+  appID: appId,
+  method: abiMethod,
+  methodArgs: [
+    deployerAddr,        // developer account
+    fundingGoal,         // funding goal
+    minimumGoal,         // minimum goal
+    stakingPeriodSeconds // staking period
+  ],
+  sender: deployerAddr,
+  suggestedParams: initParams,
+  signer: algosdk.makeBasicAccountTransactionSigner(deployer),
+});
+
+const initResult = await atc.execute(algod, 4);
+console.log("✅ Contract initialized");
+console.log("   Funding goal: 1000 ALGO");
+console.log("   Minimum goal: 5 ALGO");
+console.log("   Staking period: 30 days");
 
 console.log("\nAdd to frontend .env:");
 console.log(`VITE_PROTIUS_STAKING_APP_ID=${appId}`);

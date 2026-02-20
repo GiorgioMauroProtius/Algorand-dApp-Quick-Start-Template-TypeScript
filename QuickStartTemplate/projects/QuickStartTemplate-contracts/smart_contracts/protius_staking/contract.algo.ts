@@ -11,7 +11,7 @@ import {
 } from '@algorandfoundation/algorand-typescript'
 
 export class ProtiusStaking extends Contract {
-  // -------- Global state --------
+  // --------Global state --------
 
   developer = GlobalState<Account>()
   fundingGoal = GlobalState<uint64>()
@@ -34,6 +34,13 @@ export class ProtiusStaking extends Contract {
   }
 
   // -------- Methods (ABI accessible) --------
+
+  @abimethod({ allowActions: 'OptIn' })
+  public optIn(): void {
+    // Initialize local state for the staker
+    this.stakeAmount(Txn.sender).value = Uint64(0)
+    this.hasWithdrawn(Txn.sender).value = Uint64(0)
+  }
 
   @abimethod()
   public init(
